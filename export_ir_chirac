@@ -1,0 +1,18 @@
+import tabula
+import pandas as pd
+
+# PDF file to extract tables from
+file = r"C:\Users\LENOVO\Downloads\FRAN_20130086_IR.pdf"
+
+
+# Extract tables from PDF
+tables = tabula.read_pdf(file, pages='all', multiple_tables=False, encoding='latin-1')
+
+# Convertir chaque table en DataFrame pandas
+dataframes = [table for table in tables]
+
+# Exporter chaque DataFrame vers un fichier CSV
+for i, df in enumerate(dataframes, 1):
+    df.to_csv(f"table_{i}.csv", index=False)
+
+print("Export CSV réussi.")
