@@ -27,7 +27,7 @@ with open("donnees_extraites.csv", "w", newline="", encoding="utf-8") as csvfile
                 pieces = ""
                 if pieces_element is not None:
                     # Utiliser une expression régulière pour extraire les chiffres après "Reportage"
-                    match = re.search(r"Reportages?\s*(\d{4})", pieces_element.text, re.IGNORECASE)
+                    match = re.search(r"Reportages?\s*(\d{4}\s?\w?\w?\w?)", pieces_element.text, re.IGNORECASE)
                     if match:
                         pieces = match.group(1)
 
