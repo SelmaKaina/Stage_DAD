@@ -1,0 +1,39 @@
+# Définir la fonction récursive pour obtenir la structure du dossier
+function Export-FolderStructure {
+    param(
+        [string]$Path,
+        [string]$OutputFile
+    )
+
+    # Récupérer la liste des éléments dans le dossier spécifié
+    $Items = Get-ChildItem -Path $Path
+
+    # Parcourir tous les éléments
+    foreach ($Item in $Items) {
+        # Vérifier si l'élément est un dossier
+        if ($Item.PSIsContainer) {
+            # Écrire le dossier dans le fichier CSV
+            Add-Content -Path $OutputFile -Value "$($Item.FullName),Dossier"
+            # Appeler récursivement cette fonction pour les sous-dossiers
+            Export-FolderStructure -Path $Item.FullName -OutputFile $OutputFile
+        } else {
+            # Écrire le fichier dans le fichier CSV
+            Add-Content -Path $OutputFile -Value "$($Item.FullName),Fichier"
+        }
+    }
+}
+
+# Spécifier le chemin du dossier à explorer
+$FolderPath = "C:\chemin\vers\votre\dossier"
+
+# Spécifier le chemin et le nom du fichier CSV de sortie
+$OutputCSV = "structure_dossier.csv"
+
+# Créer un fichier CSV vide
+New-Item -Path $OutputCSV -ItemType "file" -Force | Out-Null
+
+# Écrire l'en-tête du fichier CSV
+Add-Content -Path $OutputCSV -Value "Nom du fichier,Type"
+
+# Appeler la fonction pour exporter la structure du dossier
+Export-FolderStructure -Path $FolderPath -OutputFile $OutputCSV
