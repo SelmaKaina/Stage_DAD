@@ -1,0 +1,17 @@
+# Définir le chemin du dossier racine
+$dossierRacine = "chemin"
+
+# Définir le chemin du fichier de sortie
+$fichierSortie = "chemin\hash.csv"
+
+# Parcourir récursivement tous les fichiers JPG dans l'arborescence
+Get-ChildItem -Path $dossierRacine -Filter *.jpg -File -Recurse | ForEach-Object {
+    # Définir la commande pour ImageMagick (hash,nom)
+    $commande = "identify -format `"%#,%f`" `"$($_.FullName)`""
+
+    # Exécuter la commande ImageMagick pour chaque fichier et stocker la sortie
+    $resultat = Invoke-Expression -Command $commande
+
+    # Ajouter le résultat à un fichier de sortie
+    Add-Content -Path $fichierSortie -Value $resultat
+}
