@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 import re
 import xml.dom.minidom
+from exiftool import ExifTool
 
 date_ajd = datetime.today().strftime("%Y-%m-%dT%H:%M:%S")
 
@@ -50,7 +51,14 @@ def parcourir_arborescence(dir_path):
     return fichiers_dossiers
 
 
-def creer_xml(data_ir, fichiers_dossiers):
+def exif_extract(dir_path):
+    with ExifTool() as et:
+        data = et.execute_json(*['-r', '-FileName', '-CreateDate', '-By-line',
+                                 '-Caption-Abstract', '-Subject'] + [dir_path])
+        return data
+
+
+def creer_xml(data_ir, fichiers_dossiers, data):
     root = ET.Element("ArchiveTransfer")
     comment = ET.SubElement(root, "Comment")
     comment.text = "SIP Application"
@@ -81,7 +89,7 @@ def creer_xml(data_ir, fichiers_dossiers):
         enddate.text = RP[3]
         for path, name in fichiers_dossiers:
             if RP[0] in path:
-                if re.search("\\d{2}\\s", name):
+                if re.search("\\d{2}\\s" or "\\d{3}\\s", name):
                     name_sec = name
                     archiveunitsec = ET.SubElement(archiveunitgr, "ArchiveUnit")
                     content_sec = ET.SubElement(archiveunitsec, "Content")
@@ -99,8 +107,29 @@ def creer_xml(data_ir, fichiers_dossiers):
                                 ET.SubElement(origag, "Identifier").text = "TEST"
                                 subag = ET.SubElement(content_it, "SubmissionAgency")
                                 ET.SubElement(subag, "Identifier").text = "TEST"
+                                for item in data:
+                                    if item["File:FileName"] == name:
+                                        if item.get("IPTC:By-line"):
+                                            authag = ET.SubElement(content_it, "AuthorizedAgent")
+                                            agname = ET.SubElement(authag, "FullName")
+                                            agname.text = item["IPTC:By-line"]
+                                            ET.SubElement(authag, "Activity").text = "Photographe"
+                                            ET.SubElement(authag, "Mandate").text = "Photographe Elysée"
+                                        else:
+                                            pass
+                                        if item.get("IPTC:Caption-Abstract"):
+                                            description = ET.SubElement(content_it, "Description")
+                                            description.text = item["IPTC:Caption-Abstract"]
+                                        else:
+                                            pass
+                                        if item.get("XMP:CreateDate"):
+                                            startdateit = ET.SubElement(content_it, "StartDate")
+                                            startdateit.text = item["XMP:CreateDate"]
+                                            enddateit = ET.SubElement(content_it, "EndDate")
+                                            enddateit.text = item["XMP:CreateDate"]
+                                        else:
+                                            pass
 
-    # Créer et retourner un objet ElementTree avec l'élément racine
     return ET.ElementTree(root)
 
 
@@ -115,8 +144,9 @@ def main():
     selected_directory = select_directory()
     print("Dossier sélectionné :", selected_directory)
     fichiers_dossiers = parcourir_arborescence(selected_directory)
+    data = exif_extract(selected_directory)
 
-    arbre_xml = creer_xml(data_ir, fichiers_dossiers)
+    arbre_xml = creer_xml(data_ir, fichiers_dossiers, data)
     xml_str = ET.tostring(arbre_xml.getroot(), encoding='unicode')
 
     # Parser la chaîne de caractères XML avec minidom pour l'indenter
