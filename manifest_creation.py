@@ -13,6 +13,8 @@ import re
 import xml.dom.minidom
 from exiftool import ExifTool
 
+# -*- coding: utf-8 -*-
+
 date_ajd = datetime.today().strftime("%Y-%m-%dT%H:%M:%S")
 
 
@@ -30,7 +32,7 @@ def select_csv():
 
 def lire_ir_csv(csv_path):
     data_ir = []
-    with open(csv_path, newline='', encoding='iso-8859-1') as csvfile:
+    with open(csv_path, newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter=';')
         for row in reader:
             data_ir.append(row)
@@ -52,8 +54,9 @@ def parcourir_arborescence(dir_path):
 
 
 def exif_extract(dir_path):
+
     with ExifTool() as et:
-        data = et.execute_json(*['-r', '-FileName', '-CreateDate', '-By-line',
+        data = et.execute_json(*['-r', '-b', '-FileName', '-CreateDate', '-By-line',
                                  '-Caption-Abstract', '-Subject'] + [dir_path])
         return data
 
@@ -112,9 +115,10 @@ def creer_xml(data_ir, fichiers_dossiers, data):
                                         if item.get("IPTC:By-line"):
                                             authag = ET.SubElement(content_it, "AuthorizedAgent")
                                             agname = ET.SubElement(authag, "FullName")
+                                            item["IPTC:By-line"] = item["IPTC:By-line"]
                                             agname.text = item["IPTC:By-line"]
                                             ET.SubElement(authag, "Activity").text = "Photographe"
-                                            ET.SubElement(authag, "Mandate").text = "Photographe Elysée"
+                                            ET.SubElement(authag, "Mandate").text = "Photographe Pr\xc3\xa9sidence"
                                         else:
                                             pass
                                         if item.get("IPTC:Caption-Abstract"):
@@ -147,15 +151,15 @@ def main():
     data = exif_extract(selected_directory)
 
     arbre_xml = creer_xml(data_ir, fichiers_dossiers, data)
-    xml_str = ET.tostring(arbre_xml.getroot(), encoding='unicode')
+    xml_str = ET.tostring(arbre_xml.getroot())
 
     # Parser la chaîne de caractères XML avec minidom pour l'indenter
     dom = xml.dom.minidom.parseString(xml_str)
     pretty_xml_str = dom.toprettyxml()
 
     # Enregistrer l'arborescence XML indentée dans un fichier
-    with open("test.xml", "w", encoding="utf-8") as f:
-        f.write(pretty_xml_str)
+    with open("test.xml", "w") as t:
+        t.write(pretty_xml_str)
 
 
 if __name__ == "__main__":
