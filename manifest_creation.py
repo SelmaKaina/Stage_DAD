@@ -56,8 +56,8 @@ def parcourir_arborescence(dir_path):
 def exif_extract(dir_path):
 
     with ExifTool() as et:
-        data = et.execute_json(*['-r', '-b', '-FileName', '-CreateDate', '-By-line',
-                                 '-Caption-Abstract', '-Subject', '-Artist'] + [dir_path])
+        data = et.execute_json(*['-r', '-b', '-FileName', '-CreateDate', '-By-line', '-City', '-Country',
+                                 '-Country-PrimaryLocationName', '-Caption-Abstract', '-Subject', '-Artist'] + [dir_path])
         return data
 
 
@@ -165,13 +165,45 @@ def creer_xml(data_ir, fichiers_dossiers, data):
                                         if item.get("XMP:Subject"):
                                             if not isinstance(item["XMP:Subject"], list):
                                                 tagit = ET.SubElement(content_it, "Tag")
-                                                tagit.text = tag
+                                                tagit.text = item["XMP:Subject"]
                                             else:
                                                 for tag in item["XMP:Subject"]:
                                                     tagit = ET.SubElement(content_it, "Tag")
                                                     tagit.text = tag
                                         else:
+                                            if item.get("IPTC:Keywords"):
+                                                if not isinstance(item["IPTC:Keywords"], list):
+                                                    tagit = ET.SubElement(content_it, "Tag")
+                                                    tagit.text = item["IPTC:Keywords"]
+                                                else:
+                                                    for tag in item["IPTC:Keywords"]:
+                                                        tagit = ET.SubElement(content_it, "Tag")
+                                                        tagit.text = tag
+                                            else:
+                                                pass
+                                        if item.get("XMP:Country" or "IPTC:Country-PrimaryLocationName" or "XMP:City" or "IPTC:City"):
+                                            cov = ET.SubElement(content_it, "Coverage")
+                                            if item.get("XMP:Country"):
+                                                spatial_pays = ET.SubElement(cov, "Spatial")
+                                                spatial_pays.text = item["XMP:Country"]
+                                            else:
+                                                if item.get("IPTC:Country-PrimaryLocationName"):
+                                                    spatial_pays = ET.SubElement(cov, "Spatial")
+                                                    spatial_pays.text = item["IPTC:Country-PrimaryLocationName"]
+                                                else:
+                                                    pass
+                                            if item.get("XMP:City"):
+                                                spatial_ville = ET.SubElement(cov, "Spatial")
+                                                spatial_ville.text = item["XMP:City"]
+                                            else:
+                                                if item.get("IPTC:City"):
+                                                    spatial_ville = ET.SubElement(cov, "Spatial")
+                                                    spatial_ville.text = item["IPTC:City"]
+                                                else:
+                                                    pass
+                                        else:
                                             pass
+
 
     return ET.ElementTree(root)
 
@@ -203,5 +235,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
