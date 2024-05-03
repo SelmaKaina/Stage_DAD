@@ -57,7 +57,7 @@ def exif_extract(dir_path):
 
     with ExifTool() as et:
         data = et.execute_json(*['-r', '-b', '-FileName', '-CreateDate', '-By-line',
-                                 '-Caption-Abstract', '-Subject'] + [dir_path])
+                                 '-Caption-Abstract', '-Subject', '-Artist'] + [dir_path])
         return data
 
 
@@ -87,9 +87,13 @@ def creer_xml(data_ir, fichiers_dossiers, data):
         subag = ET.SubElement(content, "SubmissionAgency")
         ET.SubElement(subag, "Identifier").text = "TEST"
         startdate = ET.SubElement(content, "StartDate")
-        startdate.text = RP[2]
+        dtd = datetime.strptime(RP[2], "%d.%m.%Y")
+        dtd = dtd.strftime("%Y-%m-%dT%H:%M:%S")
+        startdate.text = dtd
         enddate = ET.SubElement(content, "EndDate")
-        enddate.text = RP[3]
+        dtf = datetime.strptime(RP[3], "%d.%m.%Y")
+        dtf = dtf.strftime("%Y-%m-%dT%H:%M:%S")
+        enddate.text = dtf
         for path, name in fichiers_dossiers:
             if RP[0] in path:
                 if re.search("\\d{2}\\s" or "\\d{3}\\s", name):
@@ -120,7 +124,15 @@ def creer_xml(data_ir, fichiers_dossiers, data):
                                             ET.SubElement(authag, "Activity").text = "Photographe"
                                             ET.SubElement(authag, "Mandate").text = "Photographe Pr\xc3\xa9sidence"
                                         else:
-                                            pass
+                                            if item.get("EXIF:Artist"):
+                                                authag = ET.SubElement(content_it, "AuthorizedAgent")
+                                                agname = ET.SubElement(authag, "FullName")
+                                                item["EXIF:Artist"] = item["EXIF:Artist"]
+                                                agname.text = item["EXIF:Artist"]
+                                                ET.SubElement(authag, "Activity").text = "Photographe"
+                                                ET.SubElement(authag, "Mandate").text = "Photographe Pr\xc3\xa9sidence"
+                                            else:
+                                                pass
                                         if item.get("IPTC:Caption-Abstract"):
                                             description = ET.SubElement(content_it, "Description")
                                             description.text = item["IPTC:Caption-Abstract"]
@@ -128,9 +140,36 @@ def creer_xml(data_ir, fichiers_dossiers, data):
                                             pass
                                         if item.get("XMP:CreateDate"):
                                             startdateit = ET.SubElement(content_it, "StartDate")
-                                            startdateit.text = item["XMP:CreateDate"]
-                                            enddateit = ET.SubElement(content_it, "EndDate")
-                                            enddateit.text = item["XMP:CreateDate"]
+                                            createdate = item["XMP:CreateDate"]
+                                            match = re.match(r"(\d{4}:\d{2}:\d{2}\s\d{2}:\d{2}:\d{2})(?:(\.\d+))?(?:([-+]\d{2}:\d{2}))?", createdate)
+                                            if match:
+                                                createdate = match.group(1)
+                                                createdate = datetime.strptime(createdate, "%Y:%m:%d %H:%M:%S")
+                                                createdate = createdate.strftime("%Y-%m-%dT%H:%M:%S")
+                                                startdateit.text = createdate
+                                                enddateit = ET.SubElement(content_it, "EndDate")
+                                                enddateit.text = createdate
+                                        if item.get("EXIF:CreateDate"):
+                                            startdateit = ET.SubElement(content_it, "StartDate")
+                                            createdate = item["EXIF:CreateDate"]
+                                            match = re.match(r"(\d{4}:\d{2}:\d{2}\s\d{2}:\d{2}:\d{2})(?:(\.\d+))?(?:([-+]\d{2}:\d{2}))?", createdate)
+                                            if match:
+                                                createdate = match.group(1)
+                                                createdate = datetime.strptime(createdate, "%Y:%m:%d %H:%M:%S")
+                                                createdate = createdate.strftime("%Y-%m-%dT%H:%M:%S")
+                                                startdateit.text = createdate
+                                                enddateit = ET.SubElement(content_it, "EndDate")
+                                                enddateit.text = createdate
+                                            else:
+                                                pass
+                                        if item.get("XMP:Subject"):
+                                            if not isinstance(item["XMP:Subject"], list):
+                                                tagit = ET.SubElement(content_it, "Tag")
+                                                tagit.text = tag
+                                            else:
+                                                for tag in item["XMP:Subject"]:
+                                                    tagit = ET.SubElement(content_it, "Tag")
+                                                    tagit.text = tag
                                         else:
                                             pass
 
