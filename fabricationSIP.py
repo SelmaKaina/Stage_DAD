@@ -188,24 +188,30 @@ def ua_rp(directory, data_ir, arbre_rp, data):
                     dtf = dtf.strftime("%Y-%m-%dT%H:%M:%S")
                     enddate.text = dtf
                     archiveunitchild = sub_unit(item_path, data, data_ir)
-                    archiveunitrp.append(archiveunitchild)
+                    for child in archiveunitchild:
+                        archiveunitrp.append(child)
                     descrmd.append(archiveunitrp)
     return root
 
 
-def sub_unit(directory, data, data_ir):
-    archiveunit = ET.Element("ArchiveUnit")
+def sub_unit(directory, data, data_ir, parent=None):
+    if parent is None:
+        archiveunit = ET.Element("ArchiveUnit")
+    else:
+        archiveunit = parent
     for item in os.listdir(directory):
         item_path = os.path.join(directory, item)
         if os.path.isdir(item_path):
+            sub_archive_unit = ET.SubElement(archiveunit, "ArchiveUnit")
             contentsub = create_archive_unit_dir(item, data_ir)
-            archiveunit.append(contentsub)
-            archiveunitchild = sub_unit(item_path, data, data_ir)
-            archiveunit.append(archiveunitchild)
+            sub_archive_unit.append(contentsub)
+            sub_unit(item_path, data, data_ir, sub_archive_unit)
         elif os.path.isfile(item_path) and "DS_Store" not in item:
             file_unit = create_archive_unit_file(item, data)
             archiveunit.append(file_unit)
-    return archiveunit
+    if parent is None:
+        au_child = archiveunit.findall("./ArchiveUnit")
+        return au_child
 
 
 def attach_sub_rp(selected_directory, arbre_rp, data_ir):
