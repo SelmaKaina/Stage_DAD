@@ -25,6 +25,23 @@ IMPORT DE L'ARBORESCENCE / IMPORT DE L'IR / LECTURE DE L'IR / EXTRACTION DES MET
 """
 
 
+def get_archiveunit_id():
+    num_entree = input("Saisissez le numéro d'entrée :")
+    num_paquet = input("Saisissez le numéro du paquet :")
+    archival_agency_archive_unit_identifier = num_entree + "_" + num_paquet + "_"
+    return archival_agency_archive_unit_identifier
+
+
+def comment_message_id():
+    value = input("Saisissez la valeur des balises Comment et MessageIdentifier :")
+    return value
+def select_list_rp():
+    list_rp = filedialog.askopenfilename()
+    my_file = open(list_rp, "r")
+    data = my_file.read()
+    data_into_list = data.replace('\n', ',').split(",")
+    return data_into_list
+
 def select_directory():
     dir_path = filedialog.askdirectory()
     return dir_path
@@ -32,10 +49,6 @@ def select_directory():
 
 def select_csv():
     csv_path = filedialog.askopenfilename()
-    return csv_path
-
-
-def lire_ir_csv(csv_path):
     data_ir = []
     with open(csv_path, newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter=';')
@@ -74,7 +87,7 @@ CREATION DE L'EN-TETE DU MANIFEST
 """
 
 
-def creer_root():
+def creer_root(value):
     root = ET.Element("ArchiveTransfer")
     root.set('xmlns:xlink', 'http://www.w3.org/1999/xlink')
     root.set('xmlns:pr', 'info:lc/xmlns/premis-v2')
@@ -83,12 +96,12 @@ def creer_root():
     root.set('xsi:schemaLocation', 'fr:gouv:culture:archivesdefrance:seda:v2.1 seda-2.1-main.xsd')
     root.set('xml:id', 'ID1')
     comment = ET.SubElement(root, "Comment")
-    comment.text = "SIP Application"
+    comment.text = value
 
     date = ET.SubElement(root, "Date")
     date.text = date_ajd
 
-    ET.SubElement(root, "MessageIdentifier").text = "MessageIdentifier0"
+    ET.SubElement(root, "MessageIdentifier").text = value
     archag = ET.SubElement(root, "ArchivalAgreement")
     archag.text = "TEST"
     archag.set('xmlns','fr:gouv:culture:archivesdefrance:seda:v2.1')
@@ -132,37 +145,43 @@ CREATION DU DATAOBJECTPACKAGE
 
 
 def dataobjgrp(arbre, directory, data_ir):
+    liste = []
     root = arbre
     dtbjpck = root.find("DataObjectPackage")
     for dirpath, dirnames, filenames in os.walk(directory):
-        for RP in data_ir:
-            if RP[0] in dirpath:
-                for item in filenames:
-                    if "DS_Store" not in item and "Thumbs" not in item:
-                        dtbjgrp = ET.SubElement(dtbjpck,"DataObjectGroup")
-                        got = 0
-                        for i in dtbjpck.findall("DataObjectGroup"):
-                            got = got+1
-                            i.set('id', 'GOT'+str(got))
-                        bdtbj = ET.SubElement(dtbjgrp, "BinaryDataObject")
-                        id = 0
-                        for j in dtbjpck.findall(".//BinaryDataObject"):
-                            id = id+1
-                            j.set('id', 'ID'+str(id))
-                        myid = bdtbj.attrib['id']
-                        ET.SubElement(bdtbj, "DataObjectVersion").text = "BinaryMaster_1"
-                        uri = ET.SubElement(bdtbj, "Uri")
-                        uri.text = 'content/' + myid + "." + item.split('.')[-1]
-                        mdigest = ET.SubElement(bdtbj, "MessageDigest")
-                        mdigest.set("algorithm", "SHA-512")
-                        ET.SubElement(bdtbj, "Size")
-                        formatid = ET.SubElement(bdtbj, "FormatIdentification")
-                        ET.SubElement(formatid, "FormatLitteral")
-                        ET.SubElement(formatid, "MimeType")
-                        ET.SubElement(formatid, "FormatId")
-                        fileinfo = ET.SubElement(bdtbj, "FileInfo")
-                        ET.SubElement(fileinfo, "Filename").text = item
-                        ET.SubElement(fileinfo, "LastModified")
+        for num in liste_rp:
+            for RP in data_ir:
+                if num == RP[0] and num in dirpath:
+                    for item in filenames:
+                        if item in liste:
+                            pass
+                        else:
+                            liste.append(item)
+                            if "DS_Store" not in item and "Thumbs" not in item:
+                                dtbjgrp = ET.SubElement(dtbjpck,"DataObjectGroup")
+                                got = 0
+                                for i in dtbjpck.findall("DataObjectGroup"):
+                                    got = got+1
+                                    i.set('id', 'GOT'+str(got))
+                                bdtbj = ET.SubElement(dtbjgrp, "BinaryDataObject")
+                                id = 0
+                                for j in dtbjpck.findall(".//BinaryDataObject"):
+                                    id = id+1
+                                    j.set('id', 'ID'+str(id))
+                                myid = bdtbj.attrib['id']
+                                ET.SubElement(bdtbj, "DataObjectVersion").text = "BinaryMaster_1"
+                                uri = ET.SubElement(bdtbj, "Uri")
+                                uri.text = 'content/' + myid + "." + item.split('.')[-1]
+                                mdigest = ET.SubElement(bdtbj, "MessageDigest")
+                                mdigest.set("algorithm", "SHA-512")
+                                ET.SubElement(bdtbj, "Size")
+                                formatid = ET.SubElement(bdtbj, "FormatIdentification")
+                                ET.SubElement(formatid, "FormatLitteral")
+                                ET.SubElement(formatid, "MimeType")
+                                ET.SubElement(formatid, "FormatId")
+                                fileinfo = ET.SubElement(bdtbj, "FileInfo")
+                                ET.SubElement(fileinfo, "Filename").text = item
+                                ET.SubElement(fileinfo, "LastModified")
     return root
 
 
@@ -220,43 +239,46 @@ CREATION DE DESCRIPTIVE METADATA
 
 
 # Création d'un élément ArchiveUnit de niveau reportage pour chaque dossier dans le répertoire fourni en entrée
-def ua_rp(directory, data_ir, arbre_rp, data):
+def ua_rp(directory, data_ir, arbre_rp, data, liste_rp):
     root = arbre_rp
     data_object_package = root.find("DataObjectPackage")
     descrmd = ET.SubElement(data_object_package, "DescriptiveMetadata")
     for item in os.listdir(directory):
-        for RP in data_ir:
-            if RP[0] in item:
-                item_path = os.path.join(directory, item)
-                if os.path.isdir(item_path):
-                    archiveunitrp = ET.Element("ArchiveUnit")
-                    contentrp = ET.SubElement(archiveunitrp, "Content")
-                    titlerp = ET.SubElement(contentrp, "Title")
-                    titlerp.text = RP[1]
-                    ET.SubElement(contentrp, "DescriptionLevel").text = "RecordGrp"
-                    numrp = ET.SubElement(contentrp, "OriginatingAgencyArchiveUnitIdentifier")
-                    numrp.text = RP[0]
-                    origag = ET.SubElement(contentrp, "OriginatingAgency")
-                    ET.SubElement(origag, "Identifier").text = "TEST"
-                    subag = ET.SubElement(contentrp, "SubmissionAgency")
-                    ET.SubElement(subag, "Identifier").text = "TEST"
-                    startdate = ET.SubElement(contentrp, "StartDate")
-                    dtd = datetime.strptime(RP[2], "%d.%m.%Y")
-                    dtd = dtd.strftime("%Y-%m-%dT%H:%M:%S")
-                    startdate.text = dtd
-                    enddate = ET.SubElement(contentrp, "EndDate")
-                    dtf = datetime.strptime(RP[3], "%d.%m.%Y")
-                    dtf = dtf.strftime("%Y-%m-%dT%H:%M:%S")
-                    enddate.text = dtf
-                    archiveunitchild = sub_unit(item_path, data, data_ir)
-                    for child in archiveunitchild:
-                        archiveunitrp.append(child)
-                    descrmd.append(archiveunitrp)
+        for num in liste_rp:
+            for RP in data_ir:
+                if num == RP[0] and num in item:
+                    print(item)
+                    item_path = os.path.join(directory, item)
+                    if os.path.isdir(item_path):
+                        archiveunitrp = ET.Element("ArchiveUnit")
+                        contentrp = ET.SubElement(archiveunitrp, "Content")
+                        ET.SubElement(contentrp, "DescriptionLevel").text = "RecordGrp"
+                        titlerp = ET.SubElement(contentrp, "Title")
+                        titlerp.text = RP[1]
+                        ET.SubElement(contentrp, "ArchivalAgencyArchiveUnitIdentifier")
+                        numrp = ET.SubElement(contentrp, "OriginatingAgencyArchiveUnitIdentifier")
+                        numrp.text = RP[0]
+                        origag = ET.SubElement(contentrp, "OriginatingAgency")
+                        ET.SubElement(origag, "Identifier").text = "FRAN_NP_009886"
+                        subag = ET.SubElement(contentrp, "SubmissionAgency")
+                        ET.SubElement(subag, "Identifier").text = "FRAN_NP_009886"
+                        startdate = ET.SubElement(contentrp, "StartDate")
+                        dtd = datetime.strptime(RP[2], "%d.%m.%Y")
+                        dtd = dtd.strftime("%Y-%m-%dT%H:%M:%S")
+                        startdate.text = dtd
+                        enddate = ET.SubElement(contentrp, "EndDate")
+                        dtf = datetime.strptime(RP[3], "%d.%m.%Y")
+                        dtf = dtf.strftime("%Y-%m-%dT%H:%M:%S")
+                        enddate.text = dtf
+                        archiveunitchild = sub_unit(item_path, data, data_ir, liste_rp)
+                        for child in archiveunitchild:
+                            archiveunitrp.append(child)
+                        descrmd.append(archiveunitrp)
     return root
 
 
 # Reproduction de l'aborescence des sous-dossiers et fichiers dans le dossier de niveau reportage
-def sub_unit(directory, data, data_ir, parent=None):
+def sub_unit(directory, data, data_ir, liste_rp,  parent=None):
     if parent is None:
         archiveunit = ET.Element("ArchiveUnit")
     else:
@@ -265,9 +287,9 @@ def sub_unit(directory, data, data_ir, parent=None):
         item_path = os.path.join(directory, item)
         if os.path.isdir(item_path):
             sub_archive_unit = ET.SubElement(archiveunit, "ArchiveUnit")
-            contentsub = create_archive_unit_dir(item, data_ir)
+            contentsub = create_archive_unit_dir(item, data_ir, liste_rp)
             sub_archive_unit.append(contentsub)
-            sub_unit(item_path, data, data_ir, sub_archive_unit)
+            sub_unit(item_path, data, data_ir, liste_rp, sub_archive_unit)
         elif os.path.isfile(item_path) and "DS_Store" not in item and "Thumbs" not in item:
             file_unit = create_archive_unit_file(item, data)
             archiveunit.append(file_unit)
@@ -277,16 +299,22 @@ def sub_unit(directory, data, data_ir, parent=None):
 
 
 # Création d'un élément ArchiveUnit par sous-dossier
-def create_archive_unit_dir(title_dir, data_ir):
-    for RP in data_ir:
-        if RP[0] in title_dir:
-            pass
-        else:
-            contentdir = ET.Element("Content")
-            title_element = ET.SubElement(contentdir, "Title")
-            title_element.text = title_dir
-            ET.SubElement(contentdir, "DescriptionLevel").text = "RecordGrp"
-            return contentdir
+def create_archive_unit_dir(title_dir, data_ir, liste_rp):
+    for num in liste_rp:
+        for RP in data_ir:
+            if num == RP[0] and num in title_dir:
+                pass
+            else:
+                contentdir = ET.Element("Content")
+                ET.SubElement(contentdir, "DescriptionLevel").text = "RecordGrp"
+                title_element = ET.SubElement(contentdir, "Title")
+                title_element.text = title_dir
+                ET.SubElement(contentdir,"ArchivalAgencyArchiveUnitIdentifier")
+                origag = ET.SubElement(contentdir, "OriginatingAgency")
+                ET.SubElement(origag, "Identifier").text = "FRAN_NP_009886"
+                subag = ET.SubElement(contentdir, "SubmissionAgency")
+                ET.SubElement(subag, "Identifier").text = "FRAN_NP_009886"
+                return contentdir
 
 
 # Création d'un élément ArchiveUnit par fichier + import des métadonnées extraites avec Exiftool
@@ -296,8 +324,7 @@ def create_archive_unit_file(title_file, data):
     ET.SubElement(contentit, "DescriptionLevel").text = "Item"
     title_element = ET.SubElement(contentit, "Title")
     title_element.text = title_file
-    archag = ET.SubElement(contentit, "ArchivalAgencyArchiveUnitIdentifier")
-    archag.text = "TEST"
+    ET.SubElement(contentit, "ArchivalAgencyArchiveUnitIdentifier")
     for item in data:
         if item["File:FileName"] == title_file:
             if item.get("IPTC:Caption-Abstract"):
@@ -348,9 +375,9 @@ def create_archive_unit_file(title_file, data):
                 pass
 
             origag = ET.SubElement(contentit, "OriginatingAgency")
-            ET.SubElement(origag, "Identifiers").text = "TEST"
+            ET.SubElement(origag, "Identifier").text = "FRAN_NP_009886"
             subag = ET.SubElement(contentit, "SubmissionAgency")
-            ET.SubElement(subag, "Identifier").text = "TEST"
+            ET.SubElement(subag, "Identifier").text = "FRAN_NP_009886"
 
             if item.get("IPTC:By-line"):
                 authag = ET.SubElement(contentit, "AuthorizedAgent")
@@ -401,7 +428,7 @@ def create_archive_unit_file(title_file, data):
     return arch_unit_item
 
 
-def id_attrib(arbre):
+def id_attrib(arbre, archive_unit_id):
     root = arbre
     dtbjpck = root.find("DataObjectPackage")
     objgrp = dtbjpck.findall(".//DataObjectGroup")
@@ -414,6 +441,8 @@ def id_attrib(arbre):
         title = AU.find(".//Title")
         title = title.text
         dobjgrpref = AU.find(".//DataObjectGroupReferenceId")
+        archival_agency_archive_unit_identifier = AU.find(".//ArchivalAgencyArchiveUnitIdentifier")
+        archival_agency_archive_unit_identifier.text = archive_unit_id+str(id_au)
         for obj in objgrp:
             id = obj.attrib['id']
             filename = obj.find(".//Filename")
@@ -437,15 +466,16 @@ def create_descriptive_metadata(arbre):
     return root
 
 
-def copy(dir_path, target_dir, csv_data):
+def copy(dir_path, target_dir, csv_data, liste_rp):
     for item in os.listdir(dir_path):
         item_path = os.path.join(dir_path, item)
-        for row in csv_data:
-            if row[0] in item_path:
-                if os.path.isdir(item_path):
-                    copy(item_path, target_dir, csv_data)
-                elif os.path.isfile(item_path) and "DS_Store" not in item and "Thumbs" not in item:
-                    shutil.copy(item_path, os.path.join(target_dir, item))
+        for num in liste_rp:
+            for RP in data_ir:
+                if num == RP[0] and num in item_path:
+                    if os.path.isdir(item_path):
+                        copy(item_path, target_dir, csv_data, liste_rp)
+                    elif os.path.isfile(item_path) and "DS_Store" not in item and "Thumbs" not in item:
+                        shutil.copy(item_path, os.path.join(target_dir, item))
 
 
 def rename(target_dir, arbre):
@@ -468,21 +498,35 @@ def rename(target_dir, arbre):
 MAIN
 """
 
-selected_directory = select_directory()
-#print("Dossier sélectionné :", selected_directory)
+archive_unit_id = get_archiveunit_id()
+print(archive_unit_id)
 
-selected_csv = select_csv()
-#print("Fichier sélectionné :", selected_csv)
-data_ir = lire_ir_csv(selected_csv)
+value = comment_message_id()
+
+selected_directory = select_directory()
+print("Dossier sélectionné :", selected_directory)
+
+data_ir = select_csv()
+print("Fichier sélectionné de métadonnées externe sélectionné.")
+
+liste_rp = select_list_rp()
+print("Reportages sélectionnés :", liste_rp)
+
 target_dir = chose_target_dir()
+print("Répertoire cible :", target_dir)
+
 data = exif_extract(selected_directory)
+print("Métadonnées internes des photos extraites.")
+
 md_format = siegfried(selected_directory)
-root = creer_root()
+print("Métadonnées de format extraites.")
+
+root = creer_root(value)
 root = dataobjgrp(root, selected_directory, data_ir)
 root = package_metadata(root, data)
 root = format_metadata(root, md_format)
-arbre = ua_rp(selected_directory, data_ir, root, data)
-arbre = id_attrib(arbre)
+arbre = ua_rp(selected_directory, data_ir, root, data, liste_rp)
+arbre = id_attrib(arbre, archive_unit_id)
 arbre = create_descriptive_metadata(arbre)
 arbre_str = ET.tostring(arbre, encoding='unicode')
 target_manifest = os.path.split(target_dir)
@@ -490,5 +534,10 @@ target_manifest = target_manifest[0]
 target_manifest = os.path.join(target_manifest, "manifest.xml")
 with open(target_manifest, "w") as f:
     f.write(arbre_str)
-copy(selected_directory, target_dir, data_ir)
+print("Manifest créé.")
+
+copy(selected_directory, target_dir, data_ir, liste_rp)
+print("Fichiers copiés.")
+
 rename(target_dir, arbre)
+print("Fichiers renommés.")
