@@ -36,6 +36,7 @@ def comment_message_id():
     value = input("Saisissez la valeur des balises Comment et MessageIdentifier :")
     return value
 def select_list_rp():
+    input("Appuyez sur Entrée pour sélectionner le fichier txt contenant la liste des reportages à ajouter au paquet.")
     list_rp = filedialog.askopenfilename()
     my_file = open(list_rp, "r")
     data = my_file.read()
@@ -43,11 +44,13 @@ def select_list_rp():
     return data_into_list
 
 def select_directory():
+    input("Appuyez sur Entrée pour sélectionner le dossier contenant les reportages à ajouter au paquet.")
     dir_path = filedialog.askdirectory()
     return dir_path
 
 
 def select_csv():
+    input("Appuyez sur Entrée pour sélectionner le fichier csv de métadonnées externes.")
     csv_path = filedialog.askopenfilename()
     data_ir = []
     with open(csv_path, newline='') as csvfile:
@@ -58,6 +61,7 @@ def select_csv():
 
 
 def chose_target_dir():
+    input("Appuyez sur Entrée pour sélectionner le dossier de destination.")
     target_dir = filedialog.askdirectory()
     content = 'content'
     path = os.path.join(target_dir, content)
@@ -67,7 +71,6 @@ def chose_target_dir():
 
 
 def exif_extract(dir_path):
-
     with ExifTool() as et:
         data = et.execute_json(*['-r', '-b', '-FileName', '-CreateDate', '-By-line', '-City', '-Country',
                                  '-Country-PrimaryLocationName', '-Caption-Abstract', '-Subject', '-Artist',
