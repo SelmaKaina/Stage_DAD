@@ -9,6 +9,7 @@ import subprocess
 import json
 import shutil
 import logging
+from xml.dom import minidom
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -35,6 +36,8 @@ def get_archiveunit_id():
 def comment_message_id():
     value = input("Saisissez la valeur des balises Comment et MessageIdentifier :")
     return value
+
+
 def select_list_rp():
     input("Appuyez sur Entrée pour sélectionner le fichier txt contenant la liste des reportages à ajouter au paquet.")
     list_rp = filedialog.askopenfilename()
@@ -42,6 +45,7 @@ def select_list_rp():
     data = my_file.read()
     data_into_list = data.replace('\n', ',').split(",")
     return data_into_list
+
 
 def select_directory():
     input("Appuyez sur Entrée pour sélectionner le dossier contenant les reportages à ajouter au paquet.")
@@ -70,12 +74,23 @@ def chose_target_dir():
     return path
 
 
-def exif_extract(dir_path):
+def exif_extract(dir_path, liste_rp):
+    data = []
+    processed_files = set()  # Pour garder une trace des fichiers déjà traités
     with ExifTool() as et:
-        data = et.execute_json(*['-r', '-b', '-FileName', '-CreateDate', '-By-line', '-City', '-Country',
-                                 '-Country-PrimaryLocationName', '-Caption-Abstract', '-Subject', '-Artist',
-                                 '-FileModifyDate', '-Filesize#'] + [dir_path])
-        return data
+        for rp in liste_rp:
+            for item in os.listdir(dir_path):
+                if rp in item:
+                    item_path = os.path.join(dir_path, item)
+                    if item_path in processed_files:
+                        continue  # Passer au prochain fichier si celui-ci a déjà été traité
+                    exif_data_list = et.execute_json(*['-r', '-b', '-FileName', '-CreateDate', '-By-line', '-City', '-Country',
+                                                       '-Country-PrimaryLocationName', '-Caption-Abstract', '-Subject', '-Artist',
+                                                       '-FileModifyDate', '-Filesize#', '-charset'] + ['utf8'] + [item_path])
+                    if exif_data_list:
+                        data.extend(exif_data_list)
+                        processed_files.add(item_path)  # Ajouter le fichier à la liste des fichiers traités
+    return data
 
 
 
@@ -106,7 +121,7 @@ def creer_root(value):
 
     ET.SubElement(root, "MessageIdentifier").text = value
     archag = ET.SubElement(root, "ArchivalAgreement")
-    archag.text = "TEST"
+    archag.text = "FRAN_CE_0001"
     archag.set('xmlns','fr:gouv:culture:archivesdefrance:seda:v2.1')
     archag.set('xmlns:ns2', 'http://www.w3.org/1999/xlink')
     codelist = ET.SubElement(root, "CodeListVersions")
@@ -147,61 +162,56 @@ CREATION DU DATAOBJECTPACKAGE
 """
 
 
-def dataobjgrp(arbre, directory, data_ir):
-    liste = []
+def create_dataobjectgroup(arbre, directory, data_ir, liste_rp):
     root = arbre
-    dtbjpck = root.find("DataObjectPackage")
+    data_object_package = root.find("DataObjectPackage")
     for dirpath, dirnames, filenames in os.walk(directory):
         for num in liste_rp:
             for RP in data_ir:
-                if num == RP[0] and num in dirpath:
+                if num == RP[0] and str(num + " ").lower() in dirpath.lower():
                     for item in filenames:
-                        if item in liste:
-                            pass
-                        else:
-                            liste.append(item)
-                            if "DS_Store" not in item and "Thumbs" not in item:
-                                dtbjgrp = ET.SubElement(dtbjpck,"DataObjectGroup")
-                                got = 0
-                                for i in dtbjpck.findall("DataObjectGroup"):
-                                    got = got+1
-                                    i.set('id', 'GOT'+str(got))
-                                bdtbj = ET.SubElement(dtbjgrp, "BinaryDataObject")
-                                id = 0
-                                for j in dtbjpck.findall(".//BinaryDataObject"):
-                                    id = id+1
-                                    j.set('id', 'ID'+str(id))
-                                myid = bdtbj.attrib['id']
-                                ET.SubElement(bdtbj, "DataObjectVersion").text = "BinaryMaster_1"
-                                uri = ET.SubElement(bdtbj, "Uri")
-                                uri.text = 'content/' + myid + "." + item.split('.')[-1]
-                                mdigest = ET.SubElement(bdtbj, "MessageDigest")
-                                mdigest.set("algorithm", "SHA-512")
-                                ET.SubElement(bdtbj, "Size")
-                                formatid = ET.SubElement(bdtbj, "FormatIdentification")
-                                ET.SubElement(formatid, "FormatLitteral")
-                                ET.SubElement(formatid, "MimeType")
-                                ET.SubElement(formatid, "FormatId")
-                                fileinfo = ET.SubElement(bdtbj, "FileInfo")
-                                ET.SubElement(fileinfo, "Filename").text = item
-                                ET.SubElement(fileinfo, "LastModified")
+                        if "DS_Store" not in item and "Thumbs" not in item and "BridgeSort" not in item:
+                            data_object_group = ET.SubElement(data_object_package,"DataObjectGroup")
+                            got = 0
+                            for i in data_object_package.findall("DataObjectGroup"):
+                                got = got+1
+                                i.set('id', 'GOT'+str(got))
+                            binary_data_object = ET.SubElement(data_object_group, "BinaryDataObject")
+                            id = 0
+                            for j in data_object_package.findall(".//BinaryDataObject"):
+                                id = id+1
+                                j.set('id', 'BDO'+str(id))
+                            myid = binary_data_object.attrib['id']
+                            ET.SubElement(binary_data_object, "DataObjectVersion").text = "BinaryMaster_1"
+                            uri = ET.SubElement(binary_data_object, "Uri")
+                            uri.text = 'content/' + myid + "." + item.split('.')[-1]
+                            message_digest = ET.SubElement(binary_data_object, "MessageDigest")
+                            message_digest.set("algorithm", "SHA-512")
+                            ET.SubElement(binary_data_object, "Size")
+                            format_identification = ET.SubElement(binary_data_object, "FormatIdentification")
+                            ET.SubElement(format_identification, "FormatLitteral")
+                            ET.SubElement(format_identification, "MimeType")
+                            ET.SubElement(format_identification, "FormatId")
+                            file_info = ET.SubElement(binary_data_object, "FileInfo")
+                            ET.SubElement(file_info, "Filename").text = item
+                            ET.SubElement(file_info, "LastModified")
     return root
 
 
 def package_metadata(arbre, data):
     root = arbre
-    dtbjpck = root.find("DataObjectPackage")
-    bdtbj = dtbjpck.findall(".//BinaryDataObject")
-    for obj in bdtbj:
+    data_object_package = root.find("DataObjectPackage")
+    binary_data_object = data_object_package.findall(".//BinaryDataObject")
+    for obj in binary_data_object:
         item = obj.find(".//Filename").text
         for file in data:
-            if file["File:FileName"] == item:
+            if file.get("File:FileName") == item:
                 if file.get("File:FileSize"):
                     filesize = obj.find("Size")
                     filesize.text = str(file["File:FileSize"])
                 if file.get("File:FileModifyDate"):
-                    moddate = obj.find(".//LastModified")
-                    modif_date = file["File:FileModifyDate"]
+                    last_modified = obj.find(".//LastModified")
+                    modif_date = file.get("File:FileModifyDate")
                     match = re.match(
                         r"(\d{4}:\d{2}:\d{2}\s\d{2}:\d{2}:\d{2})(?:(\.\d+))?(?:([-+]\d{2}:\d{2}))?",
                         modif_date)
@@ -209,26 +219,26 @@ def package_metadata(arbre, data):
                         modif_date = match.group(1)
                         modif_date = datetime.strptime(modif_date, "%Y:%m:%d %H:%M:%S")
                         modif_date = modif_date.strftime("%Y-%m-%dT%H:%M:%S")
-                        moddate.text = modif_date
+                        last_modified.text = modif_date
     return root
 
 
 def format_metadata(arbre, md_format):
     root = arbre
-    dtbjpck = root.find("DataObjectPackage")
-    bdtbj = dtbjpck.findall(".//BinaryDataObject")
-    for obj in bdtbj:
+    data_object_package = root.find("DataObjectPackage")
+    binary_data_object = data_object_package.findall(".//BinaryDataObject")
+    for obj in binary_data_object:
         item = obj.find(".//Filename").text
         fichiers = md_format["files"]
         for file in fichiers:
             if item in file["filename"]:
-                mdigest = obj.find("MessageDigest")
-                mdigest.text = file["sha512"]
-                formatlit = obj.find(".//FormatLitteral")
+                message_digest = obj.find("MessageDigest")
+                message_digest.text = file["sha512"]
+                format_litteral = obj.find(".//FormatLitteral")
                 mime = obj.find(".//MimeType")
                 formatid = obj.find(".//FormatId")
                 for i in file["matches"]:
-                    formatlit.text = i["format"]
+                    format_litteral.text = i["format"]
                     mime.text = i["mime"]
                     formatid.text = i["id"]
     return root
@@ -245,11 +255,11 @@ CREATION DE DESCRIPTIVE METADATA
 def ua_rp(directory, data_ir, arbre_rp, data, liste_rp):
     root = arbre_rp
     data_object_package = root.find("DataObjectPackage")
-    descrmd = ET.SubElement(data_object_package, "DescriptiveMetadata")
+    descriptive_metadata = ET.SubElement(data_object_package, "DescriptiveMetadata")
     for item in os.listdir(directory):
         for num in liste_rp:
             for RP in data_ir:
-                if num == RP[0] and num in item:
+                if num == RP[0] and str(num+" ").lower() in item.lower():
                     print(item)
                     item_path = os.path.join(directory, item)
                     if os.path.isdir(item_path):
@@ -261,10 +271,10 @@ def ua_rp(directory, data_ir, arbre_rp, data, liste_rp):
                         ET.SubElement(contentrp, "ArchivalAgencyArchiveUnitIdentifier")
                         numrp = ET.SubElement(contentrp, "OriginatingAgencyArchiveUnitIdentifier")
                         numrp.text = RP[0]
-                        origag = ET.SubElement(contentrp, "OriginatingAgency")
-                        ET.SubElement(origag, "Identifier").text = "FRAN_NP_009886"
-                        subag = ET.SubElement(contentrp, "SubmissionAgency")
-                        ET.SubElement(subag, "Identifier").text = "FRAN_NP_009886"
+                        originating_agency = ET.SubElement(contentrp, "OriginatingAgency")
+                        ET.SubElement(originating_agency, "Identifier").text = "FRAN_NP_009886"
+                        submission_agency = ET.SubElement(contentrp, "SubmissionAgency")
+                        ET.SubElement(submission_agency, "Identifier").text = "FRAN_NP_009886"
                         startdate = ET.SubElement(contentrp, "StartDate")
                         dtd = datetime.strptime(RP[2], "%d.%m.%Y")
                         dtd = dtd.strftime("%Y-%m-%dT%H:%M:%S")
@@ -276,7 +286,7 @@ def ua_rp(directory, data_ir, arbre_rp, data, liste_rp):
                         archiveunitchild = sub_unit(item_path, data, data_ir, liste_rp)
                         for child in archiveunitchild:
                             archiveunitrp.append(child)
-                        descrmd.append(archiveunitrp)
+                        descriptive_metadata.append(archiveunitrp)
     return root
 
 
@@ -293,7 +303,7 @@ def sub_unit(directory, data, data_ir, liste_rp,  parent=None):
             contentsub = create_archive_unit_dir(item, data_ir, liste_rp)
             sub_archive_unit.append(contentsub)
             sub_unit(item_path, data, data_ir, liste_rp, sub_archive_unit)
-        elif os.path.isfile(item_path) and "DS_Store" not in item and "Thumbs" not in item:
+        elif os.path.isfile(item_path) and "DS_Store" not in item and "Thumbs" not in item and "BridgeSort" not in item:
             file_unit = create_archive_unit_file(item, data)
             archiveunit.append(file_unit)
     if parent is None:
@@ -313,10 +323,10 @@ def create_archive_unit_dir(title_dir, data_ir, liste_rp):
                 title_element = ET.SubElement(contentdir, "Title")
                 title_element.text = title_dir
                 ET.SubElement(contentdir,"ArchivalAgencyArchiveUnitIdentifier")
-                origag = ET.SubElement(contentdir, "OriginatingAgency")
-                ET.SubElement(origag, "Identifier").text = "FRAN_NP_009886"
-                subag = ET.SubElement(contentdir, "SubmissionAgency")
-                ET.SubElement(subag, "Identifier").text = "FRAN_NP_009886"
+                originating_agency = ET.SubElement(contentdir, "OriginatingAgency")
+                ET.SubElement(originating_agency, "Identifier").text = "FRAN_NP_009886"
+                submission_agency = ET.SubElement(contentdir, "SubmissionAgency")
+                ET.SubElement(submission_agency, "Identifier").text = "FRAN_NP_009886"
                 return contentdir
 
 
@@ -329,92 +339,98 @@ def create_archive_unit_file(title_file, data):
     title_element.text = title_file
     ET.SubElement(contentit, "ArchivalAgencyArchiveUnitIdentifier")
     for item in data:
-        if item["File:FileName"] == title_file:
-            if item.get("IPTC:Caption-Abstract"):
-                description = ET.SubElement(contentit, "Description")
-                description.text = item["IPTC:Caption-Abstract"]
-            else:
+        if item.get("File:FileName") == title_file:
+            if contentit.find("Description") is not None:
                 pass
-            if item.get("XMP:Subject"):
-                if not isinstance(item["XMP:Subject"], list):
-                    tagit = ET.SubElement(contentit, "Tag")
-                    tagit.text = item["XMP:Subject"]
-                else:
-                    for tag in item["XMP:Subject"]:
-                        tagit = ET.SubElement(contentit, "Tag")
-                        tagit.text = tag
             else:
-                if item.get("IPTC:Keywords"):
-                    if not isinstance(item["IPTC:Keywords"], list):
+                if item.get("IPTC:Caption-Abstract"):
+                    description = ET.SubElement(contentit, "Description")
+                    description.text = item["IPTC:Caption-Abstract"]
+                else:
+                    pass
+            if contentit.find("Tag") is not None:
+                pass
+            else:
+                if item.get("XMP:Subject"):
+                    if not isinstance(item["XMP:Subject"], list):
                         tagit = ET.SubElement(contentit, "Tag")
-                        tagit.text = item["IPTC:Keywords"]
+                        tagit.text = item["XMP:Subject"]
                     else:
-                        for tag in item["IPTC:Keywords"]:
+                        for tag in item["XMP:Subject"]:
                             tagit = ET.SubElement(contentit, "Tag")
                             tagit.text = tag
                 else:
-                    pass
-            if item.get("XMP:Country" or "IPTC:Country-PrimaryLocationName" or "XMP:City" or "IPTC:City"):
-                cov = ET.SubElement(contentit, "Coverage")
-                if item.get("XMP:Country"):
-                    spatial_pays = ET.SubElement(cov, "Spatial")
-                    spatial_pays.text = item["XMP:Country"]
-                else:
-                    if item.get("IPTC:Country-PrimaryLocationName"):
-                        spatial_pays = ET.SubElement(cov, "Spatial")
-                        spatial_pays.text = item["IPTC:Country-PrimaryLocationName"]
+                    if item.get("IPTC:Keywords"):
+                        if not isinstance(item["IPTC:Keywords"], list):
+                            tagit = ET.SubElement(contentit, "Tag")
+                            tagit.text = item["IPTC:Keywords"]
+                        else:
+                            for tag in item["IPTC:Keywords"]:
+                                tagit = ET.SubElement(contentit, "Tag")
+                                tagit.text = tag
                     else:
                         pass
-                if item.get("XMP:City"):
-                    spatial_ville = ET.SubElement(cov, "Spatial")
-                    spatial_ville.text = item["XMP:City"]
-                else:
-                    if item.get("IPTC:City"):
-                        spatial_ville = ET.SubElement(cov, "Spatial")
-                        spatial_ville.text = item["IPTC:City"]
-                    else:
-                        pass
-            else:
+            if contentit.find("Coverage") is not None:
                 pass
-
-            origag = ET.SubElement(contentit, "OriginatingAgency")
-            ET.SubElement(origag, "Identifier").text = "FRAN_NP_009886"
-            subag = ET.SubElement(contentit, "SubmissionAgency")
-            ET.SubElement(subag, "Identifier").text = "FRAN_NP_009886"
-
-            if item.get("IPTC:By-line"):
-                authag = ET.SubElement(contentit, "AuthorizedAgent")
-                agname = ET.SubElement(authag, "FullName")
-                item["IPTC:By-line"] = item["IPTC:By-line"]
-                agname.text = item["IPTC:By-line"]
-                ET.SubElement(authag, "Activity").text = "Photographe"
-                ET.SubElement(authag, "Mandate").text = "Photographe Pr\xc3\xa9sidence"
             else:
-                if item.get("EXIF:Artist"):
-                    authag = ET.SubElement(contentit, "AuthorizedAgent")
-                    agname = ET.SubElement(authag, "FullName")
-                    item["EXIF:Artist"] = item["EXIF:Artist"]
-                    agname.text = item["EXIF:Artist"]
-                    ET.SubElement(authag, "Activity").text = "Photographe"
-                    ET.SubElement(authag, "Mandate").text = "Photographe Pr\xc3\xa9sidence"
+                if item.get("XMP:Country" or "IPTC:Country-PrimaryLocationName" or "XMP:City" or "IPTC:City"):
+                    cov = ET.SubElement(contentit, "Coverage")
+                    if item.get("XMP:Country"):
+                        spatial_pays = ET.SubElement(cov, "Spatial")
+                        spatial_pays.text = item["XMP:Country"]
+                    else:
+                        if item.get("IPTC:Country-PrimaryLocationName"):
+                            spatial_pays = ET.SubElement(cov, "Spatial")
+                            spatial_pays.text = item["IPTC:Country-PrimaryLocationName"]
+                        else:
+                            pass
+                    if item.get("XMP:City"):
+                        spatial_ville = ET.SubElement(cov, "Spatial")
+                        spatial_ville.text = item["XMP:City"]
+                    else:
+                        if item.get("IPTC:City"):
+                            spatial_ville = ET.SubElement(cov, "Spatial")
+                            spatial_ville.text = item["IPTC:City"]
+                        else:
+                            pass
                 else:
                     pass
-            if item.get("XMP:CreateDate"):
-                startdateit = ET.SubElement(contentit, "StartDate")
-                createdate = item["XMP:CreateDate"]
-                match = re.match(r"(\d{4}:\d{2}:\d{2}\s\d{2}:\d{2}:\d{2})(?:(\.\d+))?(?:([-+]\d{2}:\d{2}))?",
-                                 createdate)
-                if match:
-                    createdate = match.group(1)
-                    createdate = datetime.strptime(createdate, "%Y:%m:%d %H:%M:%S")
-                    createdate = createdate.strftime("%Y-%m-%dT%H:%M:%S")
-                    startdateit.text = createdate
-                    enddateit = ET.SubElement(contentit, "EndDate")
-                    enddateit.text = createdate
+            if contentit.find("OriginatingAgency") is not None:
+                pass
             else:
-                if item.get("EXIF:CreateDate"):
+                originating_agency = ET.SubElement(contentit, "OriginatingAgency")
+                ET.SubElement(originating_agency, "Identifier").text = "FRAN_NP_009886"
+            if contentit.find("SubmissionAgency") is not None:
+                pass
+            else:
+                submission_agency = ET.SubElement(contentit, "SubmissionAgency")
+                ET.SubElement(submission_agency, "Identifier").text = "FRAN_NP_009886"
+            if contentit.find("AuthorizedAgent") is not None:
+                pass
+            else:
+                if item.get("IPTC:By-line"):
+                    authorized_agent = ET.SubElement(contentit, "AuthorizedAgent")
+                    fullname = ET.SubElement(authorized_agent, "FullName")
+                    item["IPTC:By-line"] = item["IPTC:By-line"]
+                    fullname.text = item["IPTC:By-line"]
+                    ET.SubElement(authorized_agent, "Activity").text = "Photographe"
+                    ET.SubElement(authorized_agent, "Mandate").text = "Photographe Pr\xc3\xa9sidence"
+                else:
+                    if item.get("EXIF:Artist"):
+                        authorized_agent = ET.SubElement(contentit, "AuthorizedAgent")
+                        fullname = ET.SubElement(authorized_agent, "FullName")
+                        item["EXIF:Artist"] = item["EXIF:Artist"]
+                        fullname.text = item["EXIF:Artist"]
+                        ET.SubElement(authorized_agent, "Activity").text = "Photographe"
+                        ET.SubElement(authorized_agent, "Mandate").text = "Photographe Pr\xc3\xa9sidence"
+                    else:
+                        pass
+            if contentit.find("StartDate") is not None:
+                pass
+            else:
+                if item.get("XMP:CreateDate"):
                     startdateit = ET.SubElement(contentit, "StartDate")
-                    createdate = item["EXIF:CreateDate"]
+                    createdate = item["XMP:CreateDate"]
                     match = re.match(r"(\d{4}:\d{2}:\d{2}\s\d{2}:\d{2}:\d{2})(?:(\.\d+))?(?:([-+]\d{2}:\d{2}))?",
                                      createdate)
                     if match:
@@ -424,34 +440,68 @@ def create_archive_unit_file(title_file, data):
                         startdateit.text = createdate
                         enddateit = ET.SubElement(contentit, "EndDate")
                         enddateit.text = createdate
-                    else:
-                        pass
-    objref = ET.SubElement(arch_unit_item, "DataObjectReference")
-    ET.SubElement(objref, "DataObjectGroupReferenceId")
+                else:
+                    if item.get("EXIF:CreateDate"):
+                        startdateit = ET.SubElement(contentit, "StartDate")
+                        createdate = item["EXIF:CreateDate"]
+                        match = re.match(r"(\d{4}:\d{2}:\d{2}\s\d{2}:\d{2}:\d{2})(?:(\.\d+))?(?:([-+]\d{2}:\d{2}))?",
+                                         createdate)
+                        if match:
+                            createdate = match.group(1)
+                            createdate = datetime.strptime(createdate, "%Y:%m:%d %H:%M:%S")
+                            createdate = createdate.strftime("%Y-%m-%dT%H:%M:%S")
+                            startdateit.text = createdate
+                            enddateit = ET.SubElement(contentit, "EndDate")
+                            enddateit.text = createdate
+                        else:
+                            pass
+    data_object_reference = ET.SubElement(arch_unit_item, "DataObjectReference")
+    ET.SubElement(data_object_reference, "DataObjectGroupReferenceId")
     return arch_unit_item
+
+
+def delete_duplicate_dog(arbre):
+    objets_uniques = {}
+    objects_a_supprimer = []
+
+    for data_object_package in arbre.findall(".//DataObjectPackage"):
+        for data_object_group in data_object_package.findall("DataObjectGroup"):
+            binary_data_object = data_object_group.find("BinaryDataObject")
+            message_digest = binary_data_object.find("MessageDigest").text
+            filename = binary_data_object.find(".//Filename").text
+            objet = (message_digest, filename)
+            if objet in objets_uniques:
+                objects_a_supprimer.append((data_object_group, data_object_package))
+            else:
+                objets_uniques[objet] = data_object_group
+
+    for element, parent in objects_a_supprimer:
+        parent.remove(element)
+
+    return arbre
 
 
 def id_attrib(arbre, archive_unit_id):
     root = arbre
-    dtbjpck = root.find("DataObjectPackage")
-    objgrp = dtbjpck.findall(".//DataObjectGroup")
-    descrmd = dtbjpck.find("DescriptiveMetadata")
-    AUs = descrmd.findall(".//ArchiveUnit")
+    data_object_package = root.find("DataObjectPackage")
+    data_object_group = data_object_package.findall(".//DataObjectGroup")
+    descriptive_metadata = data_object_package.find("DescriptiveMetadata")
+    AUs = descriptive_metadata.findall(".//ArchiveUnit")
     id_au = 0
     for AU in AUs:
         id_au = id_au+1
         AU.set("id", "AU"+str(id_au))
         title = AU.find(".//Title")
         title = title.text
-        dobjgrpref = AU.find(".//DataObjectGroupReferenceId")
+        data_object_group_ref_id = AU.find(".//DataObjectGroupReferenceId")
         archival_agency_archive_unit_identifier = AU.find(".//ArchivalAgencyArchiveUnitIdentifier")
         archival_agency_archive_unit_identifier.text = archive_unit_id+str(id_au)
-        for obj in objgrp:
+        for obj in data_object_group:
             id = obj.attrib['id']
             filename = obj.find(".//Filename")
             filename = filename.text
             if filename == title:
-                dobjgrpref.text = id
+                data_object_group_ref_id.text = id
     return root
 
 
@@ -468,33 +518,22 @@ def create_descriptive_metadata(arbre):
     ET.SubElement(management_metadata, "SubmissionAgencyIdentifier").text = "TEST"
     return root
 
-
-def copy(dir_path, target_dir, csv_data, liste_rp):
-    for item in os.listdir(dir_path):
-        item_path = os.path.join(dir_path, item)
-        for num in liste_rp:
-            for RP in data_ir:
-                if num == RP[0] and num in item_path:
-                    if os.path.isdir(item_path):
-                        copy(item_path, target_dir, csv_data, liste_rp)
-                    elif os.path.isfile(item_path) and "DS_Store" not in item and "Thumbs" not in item:
-                        shutil.copy(item_path, os.path.join(target_dir, item))
-
-
-def rename(target_dir, arbre):
+def copy(target_dir, arbre, md_format):
     root = arbre
     data_object_package = root.find("DataObjectPackage")
-    binary_data_objects = data_object_package.findall(".//BinaryDataObject")
-    for binary_data_object in binary_data_objects:
-        file_name = binary_data_object.find(".//Filename").text
+    data_object_group = data_object_package.findall("DataObjectGroup")
+    for objet in data_object_group:
+        file_name = objet.find(".//Filename").text
+        binary_data_object = objet.find("BinaryDataObject")
         new_name = binary_data_object.attrib['id']
-        for item in os.listdir(target_dir):
-            item_path = os.path.join(target_dir, item)
-            if file_name == item:
-                oldext = os.path.splitext(item)[1]
-                new_name = new_name + oldext
-                new_path = os.path.join(target_dir, new_name)
-                os.rename(item_path, new_path)
+        oldext = os.path.splitext(file_name)[1]
+        new_name = new_name + oldext
+        new_path = os.path.join(target_dir, new_name)
+        fichiers = md_format["files"]
+        for file in fichiers:
+            old_path = file["filename"]
+            if file_name in old_path:
+                shutil.copy(old_path, new_path)
 
 
 """
@@ -518,20 +557,21 @@ print("Reportages sélectionnés :", liste_rp)
 target_dir = chose_target_dir()
 print("Répertoire cible :", target_dir)
 
-data = exif_extract(selected_directory)
+data = exif_extract(selected_directory, liste_rp)
 print("Métadonnées internes des photos extraites.")
 
 md_format = siegfried(selected_directory)
 print("Métadonnées de format extraites.")
 
 root = creer_root(value)
-root = dataobjgrp(root, selected_directory, data_ir)
+root = create_dataobjectgroup(root, selected_directory, data_ir, liste_rp)
 root = package_metadata(root, data)
 root = format_metadata(root, md_format)
 arbre = ua_rp(selected_directory, data_ir, root, data, liste_rp)
+arbre = delete_duplicate_dog(arbre)
 arbre = id_attrib(arbre, archive_unit_id)
 arbre = create_descriptive_metadata(arbre)
-arbre_str = ET.tostring(arbre, encoding='unicode')
+arbre_str = minidom.parseString(ET.tostring(arbre, encoding='unicode')).toprettyxml(indent="   ")
 target_manifest = os.path.split(target_dir)
 target_manifest = target_manifest[0]
 target_manifest = os.path.join(target_manifest, "manifest.xml")
@@ -539,8 +579,5 @@ with open(target_manifest, "w") as f:
     f.write(arbre_str)
 print("Manifest créé.")
 
-copy(selected_directory, target_dir, data_ir, liste_rp)
-print("Fichiers copiés.")
-
-rename(target_dir, arbre)
-print("Fichiers renommés.")
+copy(target_dir, arbre, md_format)
+print("Fichiers copiés et renommés.")
