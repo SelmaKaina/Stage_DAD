@@ -12,8 +12,6 @@ import logging
 import sys
 from xml.dom import minidom
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # -*- coding: utf-8 -*-
 
@@ -82,6 +80,7 @@ def select_directory():
     """
     input("Appuyez sur Entrée pour sélectionner le dossier contenant les reportages à ajouter au paquet.")
     dir_path = filedialog.askdirectory()
+    print(dir_path)
     return dir_path
 
 
@@ -116,6 +115,10 @@ def chose_target_dir():
     return path
 
 
+
+
+
+
 def exif_extract(dir_path, liste_rp):
     """
     Utilise la librairie PyExiftool pour extraire les métadonnées internes des photos.
@@ -136,12 +139,12 @@ def exif_extract(dir_path, liste_rp):
                 sys.exit("ANNULATION")
             for item in os.listdir(dir_path):  # Parcours de chaque élément dans le répertoire racine
                 # Vérification si le nom de dossier contient un numéro de reportage
-                if str(rp+" ").lower() in item.lower():
+                if str(rp+" ").lower() in item.lower() or item.lower().endswith(rp.lower()) or str(rp+"_").lower() in item.lower():
                     item_path = os.path.join(dir_path, item)  # Chemin complet vers le dossier ou fichier
                     # Extraction des métadonnées spécifiques pour les fichiers du dossier
                     exif_data_list = et.execute_json(
                         '-r', '-b', '-FileName', '-CreateDate', '-By-line', '-Artist', '-City', '-Country',
-                        '-Country-PrimaryLocationName', '-Caption-Abstract', '-Subject', '-Keywords', '-FileModifyDate',
+                        '-Country-PrimaryLocationName', '-Description', '-Subject', '-Keywords', '-FileModifyDate',
                         '-Filesize#', item_path
                     )
                     # Vérification si le fichier a déjà été traité pour éviter les doublons
@@ -152,6 +155,7 @@ def exif_extract(dir_path, liste_rp):
                         data.extend(exif_data_list)
                         processed_files.add(item_path)  # Ajouter le fichier à la liste des fichiers traités
     return data  # Retourner la liste des métadonnées extraites pour tous les fichiers concernés
+
 
 
 def siegfried(dir_path, liste_rp):
@@ -167,13 +171,14 @@ def siegfried(dir_path, liste_rp):
     for rp in liste_rp:
         # Parcours de chaque élément (fichier ou dossier) dans le répertoire racine
         for item in os.listdir(dir_path):
-            if str(rp+" ").lower() in item.lower():
+            if str(rp+" ").lower() in item.lower() or item.lower().endswith(rp.lower()) or str(rp+"_").lower() in item.lower():
                 item_path = os.path.join(dir_path, item)  # Chemin complet vers le dossier ou fichier
                 # Appel à Siegfried pour obtenir les métadonnées de format au format JSON
                 md_format = subprocess.run(["sf", "-hash", "sha512", "-json", item_path], capture_output=True,
                                            text=True, encoding="utf-8")
                 md_format = json.loads(md_format.stdout)  # Conversion de la sortie JSON en dictionnaire Python
-                format_rp.append(md_format)  # Ajout des métadonnées de format pour ce reportage à la liste
+                format_rp.append(md_format)  # Ajouter le fichier à la liste des fichiers traités
+                # Ajout des métadonnées de format pour ce reportage à la liste
 
     # Correction des chemins de fichier dans chaque dictionnaire de métadonnées de format
     for rp in format_rp:
@@ -272,7 +277,7 @@ def creer_root(value):
     ET.SubElement(root, "DataObjectPackage")
 
     # Ajout de l'élément 'TransferRequestReplyIdentifier' avec sa valeur
-    ET.SubElement(root, "TransferRequestReplyIdentifier").text = "TEST"
+    ET.SubElement(root, "TransferRequestReplyIdentifier").text = "Identifier3"
 
     # Ajout de l'élément 'ArchivalAgency' avec son identifiant
     archival_agency = ET.SubElement(root, "ArchivalAgency")
@@ -292,13 +297,11 @@ def create_dataobjectgroup(arbre, directory, liste_rp):
         Crée l'élément <DataObjectPackage> et un élément <DataObjectGroup> pour chaque fichier correspondant aux
         reportages spécifiés.
 
-        :param xml.etree.ElementTree.Element arbre: l'élément racine de l'arbre XML dans lequel les groupes d'objets de
-        données seront ajoutés.
+        :param xml.etree.ElementTree.Element arbre: l'élément racine de l'arbre XML dans lequel les groupes d'objets de données seront ajoutés.
         :param str directory: le chemin vers le répertoire racine contenant les dossiers des reportages.
         :param list liste_rp: la liste des numéros des reportages à inclure dans le SIP.
 
-        :return: xml.etree.ElementTree.Element - l'élément racine XML mis à jour avec les groupes d'objets techniques
-        ajoutés.
+        :return: xml.etree.ElementTree.Element - l'élément racine XML mis à jour avec les groupes d'objets techniques ajoutés.
         """
     root = arbre  # Utilisation de l'arbre XML passé en paramètre comme racine
 
@@ -309,13 +312,13 @@ def create_dataobjectgroup(arbre, directory, liste_rp):
     for dirpath, dirnames, filenames in os.walk(directory):
         # Remplacement des antislashs pour compatibilité avec les chemins
         dirpath = dirpath.replace("\\", "/")
-        for item in filenames:
-            item = dirpath + "/" + item  # Chemin complet du fichier
+        for i in filenames:
+            item = dirpath + "/" + i  # Chemin complet du fichier
             for num in liste_rp:
                 # Vérification si le numéro de reportage est dans le chemin du fichier
-                if str(num + " ").lower() in item.lower():
+                if str(num+" ").lower() in item.lower() or str(num+"/").lower() in item.lower() or str(num+"_").lower() in item.lower():
                     # Exclusions de certains fichiers non pertinents (fichiers système ou masqués)
-                    if "DS_Store" not in item and "Thumbs" not in item and "BridgeSort" not in item and "PM_lock" not in item and "._" not in item and "desktop.ini" not in item:
+                    if "DS_Store" not in item and "Thumbs" not in item and "BridgeSort" not in item and "PM_lock" not in item and "desktop.ini" not in item and "._" not in item and "/." not in item:
                         # Création de l'élément DataObjectGroup sous DataObjectPackage et de ses descendants
                         data_object_group = ET.SubElement(data_object_package, "DataObjectGroup")
                         binary_data_object = ET.SubElement(data_object_group, "BinaryDataObject")
@@ -348,7 +351,6 @@ def package_metadata(arbre, data):
 
     # Recherche de l'élément DataObjectPackage dans l'arbre XML
     data_object_package = root.find("DataObjectPackage")
-
     # Recherche de tous les éléments BinaryDataObject sous DataObjectPackage
     binary_data_object = data_object_package.findall(".//BinaryDataObject")
 
@@ -437,40 +439,52 @@ def ua_rp(directory, data_ir, arbre_rp, data, liste_rp, rattachement):
         for num in liste_rp:
             for item in os.listdir(directory):
                 for RP in data_ir:
-                    if num.lower() == RP[0].lower() and str(num+" ").lower() in item.lower():
-                        item_path = os.path.join(directory, item)
-                        if os.path.isdir(item_path):
-                            # Création d'une nouvelle unité d'archive pour chaque reportage
-                            archiveunitrp = ET.SubElement(ua_ghost, "ArchiveUnit")
-                            contentrp = ET.SubElement(archiveunitrp, "Content")
-                            ET.SubElement(contentrp, "DescriptionLevel").text = "RecordGrp"
-                            titlerp = ET.SubElement(contentrp, "Title")
-                            titlerp.text = RP[1]  # Titre du reportage issu du csv de métadonnées externes
-                            ET.SubElement(contentrp, "ArchivalAgencyArchiveUnitIdentifier")
-                            numrp = ET.SubElement(contentrp, "OriginatingAgencyArchiveUnitIdentifier")
-                            numrp.text = RP[0]  # Identifiant du reportage issu du csv de métadonnées externes
-                            description = ET.SubElement(contentrp, "Description")
-                            # Numéro du reportage en description (pour indexation dans le SAE)
-                            description.text = str("Reportage n°"+RP[0])
-                            # Identifiant du service producteur et versant
-                            originating_agency = ET.SubElement(contentrp, "OriginatingAgency")
-                            ET.SubElement(originating_agency, "Identifier").text = "FRAN_NP_009886"
-                            submission_agency = ET.SubElement(contentrp, "SubmissionAgency")
-                            ET.SubElement(submission_agency, "Identifier").text = "FRAN_NP_009886"
-                            startdate = ET.SubElement(contentrp, "StartDate")
-                            dtd = datetime.strptime(RP[2], "%d.%m.%Y")
-                            dtd = dtd.strftime("%Y-%m-%dT%H:%M:%S")
-                            startdate.text = dtd  # Date de début du reportage issue du csv de métadonnées externes
-                            enddate = ET.SubElement(contentrp, "EndDate")
-                            dtf = datetime.strptime(RP[3], "%d.%m.%Y")
-                            dtf = dtf.strftime("%Y-%m-%dT%H:%M:%S")
-                            enddate.text = dtf  # Date de fin du reportage issue du csv de métadonnées externes
+                    if num == RP[0]:
+                        if str(num+" ").lower() in item.lower() or item.lower().endswith(num.lower()) or str(num+"_").lower() in item.lower():
+                            print(num)  # Affichage du nom du fichier pour vérification
+                            item_path = os.path.join(directory, item)
+                            if os.path.isdir(item_path):
+                                # Création d'une nouvelle unité d'archive pour chaque reportage
+                                archiveunitrp = ET.SubElement(ua_ghost, "ArchiveUnit")
+                                contentrp = ET.SubElement(archiveunitrp, "Content")
+                                ET.SubElement(contentrp, "DescriptionLevel").text = "RecordGrp"
+                                titlerp = ET.SubElement(contentrp, "Title")
+                                titlerp.text = RP[1]  # Titre du reportage issu du csv de métadonnées externes
+                                ET.SubElement(contentrp, "ArchivalAgencyArchiveUnitIdentifier")
+                                numrp = ET.SubElement(contentrp, "OriginatingAgencyArchiveUnitIdentifier")
+                                numrp.text = RP[0]  # Identifiant du reportage issu du csv de métadonnées externes
+                                if len(RP) > 4:
+                                    if RP[4]:
+                                        cote = ET.SubElement(contentrp, "TransferringAgencyArchiveUnitIdentifier")
+                                        cote.text = RP[4]
+                                description = ET.SubElement(contentrp, "Description")
+                                # Numéro du reportage en description (pour indexation dans le SAE)
+                                description.text = str("Reportage n°"+RP[0])
+                                # Identifiant du service producteur et versant
+                                originating_agency = ET.SubElement(contentrp, "OriginatingAgency")
+                                ET.SubElement(originating_agency, "Identifier").text = "FRAN_NP_009886"
+                                submission_agency = ET.SubElement(contentrp, "SubmissionAgency")
+                                ET.SubElement(submission_agency, "Identifier").text = "FRAN_NP_009886"
+                                startdate = ET.SubElement(contentrp, "StartDate")
+                                if RP[2] is not None:
+                                    dtd = datetime.strptime(RP[2], "%d.%m.%Y")
+                                    dtd = dtd.strftime("%Y-%m-%dT%H:%M:%S")
+                                    startdate.text = dtd  # Date de début du reportage issue du csv de métadonnées externes
+                                else:
+                                    startdate.text = "0000-00-00T00:00:00"
+                                enddate = ET.SubElement(contentrp, "EndDate")
+                                if RP[3] is not None:
+                                    dtf = datetime.strptime(RP[3], "%d.%m.%Y")
+                                    dtf = dtf.strftime("%Y-%m-%dT%H:%M:%S")
+                                    enddate.text = dtf  # Date de fin du reportage issue du csv de métadonnées externes
+                                else:
+                                    enddate.text = "0000-00-00T00:00:00"
 
-                            # Appel à la fonction sub_unit pour les sous-unités d'archive
-                            archiveunitchild = sub_unit(item_path, data, data_ir, liste_rp)
-                            for child in archiveunitchild:
-                                # Ajout des sous-unités d'archive à l'unité d'archive parente
-                                archiveunitrp.append(child)
+                                # Appel à la fonction sub_unit pour les sous-unités d'archive
+                                archiveunitchild = sub_unit(item_path, data, data_ir, liste_rp)
+                                for child in archiveunitchild:
+                                    # Ajout des sous-unités d'archive à l'unité d'archive parente
+                                    archiveunitrp.append(child)
 
         descriptive_metadata.append(ua_ghost)  # Ajout de l'unité d'archive "fantôme" à DescriptiveMetadata
 
@@ -479,47 +493,57 @@ def ua_rp(directory, data_ir, arbre_rp, data, liste_rp, rattachement):
         for num in liste_rp:
             for item in os.listdir(directory):
                 for RP in data_ir:
-                    if num.lower() == RP[0].lower() and str(num+" ").lower() in item.lower():
-                        print(item)  # Affichage du nom du fichier pour vérification
-                        item_path = os.path.join(directory, item)
-                        if os.path.isdir(item_path):
-                            # Création d'une nouvelle unité d'archive pour chaque reportage
-                            archiveunitrp = ET.Element("ArchiveUnit")
-                            contentrp = ET.SubElement(archiveunitrp, "Content")
-                            ET.SubElement(contentrp, "DescriptionLevel").text = "RecordGrp"
-                            titlerp = ET.SubElement(contentrp, "Title")
-                            titlerp.text = RP[1]  # Titre du reportage issu du csv de métadonnées externes
-                            ET.SubElement(contentrp, "ArchivalAgencyArchiveUnitIdentifier")
-                            numrp = ET.SubElement(contentrp, "OriginatingAgencyArchiveUnitIdentifier")
-                            numrp.text = RP[0]  # Identifiant du reportage issu du csv de métadonnées externes
-                            description = ET.SubElement(contentrp, "Description")
-                            # Numéro du reportage en description (pour indexation dans le SAE)
-                            description.text = str("Reportage n°"+RP[0])
-                            # Identifiant du service producteur et versant
-                            originating_agency = ET.SubElement(contentrp, "OriginatingAgency")
-                            ET.SubElement(originating_agency, "Identifier").text = "FRAN_NP_009886"
-                            submission_agency = ET.SubElement(contentrp, "SubmissionAgency")
-                            ET.SubElement(submission_agency, "Identifier").text = "FRAN_NP_009886"
-                            startdate = ET.SubElement(contentrp, "StartDate")
-                            dtd = datetime.strptime(RP[2], "%d.%m.%Y")
-                            dtd = dtd.strftime("%Y-%m-%dT%H:%M:%S")
-                            startdate.text = dtd  # Date de début du reportage issue du csv de métadonnées externes
-                            enddate = ET.SubElement(contentrp, "EndDate")
-                            dtf = datetime.strptime(RP[3], "%d.%m.%Y")
-                            dtf = dtf.strftime("%Y-%m-%dT%H:%M:%S")
-                            enddate.text = dtf  # Date de fin du reportage issue du csv de métadonnées externes
+                    if num == RP[0]:
+                        if str(num+" ").lower() in item.lower() or item.lower().endswith(num.lower()) or str(num+"_").lower() in item.lower():
+                            print(num)  # Affichage du nom du fichier pour vérification
+                            item_path = os.path.join(directory, item)
+                            if os.path.isdir(item_path):
+                                # Création d'une nouvelle unité d'archive pour chaque reportage
+                                archiveunitrp = ET.Element("ArchiveUnit")
+                                contentrp = ET.SubElement(archiveunitrp, "Content")
+                                ET.SubElement(contentrp, "DescriptionLevel").text = "RecordGrp"
+                                titlerp = ET.SubElement(contentrp, "Title")
+                                titlerp.text = RP[1]  # Titre du reportage issu du csv de métadonnées externes
+                                ET.SubElement(contentrp, "ArchivalAgencyArchiveUnitIdentifier")
+                                numrp = ET.SubElement(contentrp, "OriginatingAgencyArchiveUnitIdentifier")
+                                numrp.text = RP[0]  # Identifiant du reportage issu du csv de métadonnées externes
+                                if len(RP) > 4:
+                                    if RP[4]:
+                                        cote = ET.SubElement(contentrp, "TransferringAgencyArchiveUnitIdentifier")
+                                        cote.text = RP[4]
+                                description = ET.SubElement(contentrp, "Description")
+                                # Numéro du reportage en description (pour indexation dans le SAE)
+                                description.text = str("Reportage n°"+RP[0])
+                                # Identifiant du service producteur et versant
+                                originating_agency = ET.SubElement(contentrp, "OriginatingAgency")
+                                ET.SubElement(originating_agency, "Identifier").text = "FRAN_NP_009886"
+                                submission_agency = ET.SubElement(contentrp, "SubmissionAgency")
+                                ET.SubElement(submission_agency, "Identifier").text = "FRAN_NP_009886"
+                                startdate = ET.SubElement(contentrp, "StartDate")
+                                if RP[2] is not None:
+                                    dtd = datetime.strptime(RP[2], "%d.%m.%Y")
+                                    dtd = dtd.strftime("%Y-%m-%dT%H:%M:%S")
+                                    startdate.text = dtd  # Date de début du reportage issue du csv de métadonnées externes
+                                else:
+                                    startdate.text = "0000-00-00T00:00:00"
+                                enddate = ET.SubElement(contentrp, "EndDate")
+                                if RP[3] is not None:
+                                    dtf = datetime.strptime(RP[3], "%d.%m.%Y")
+                                    dtf = dtf.strftime("%Y-%m-%dT%H:%M:%S")
+                                    enddate.text = dtf  # Date de fin du reportage issue du csv de métadonnées externes
+                                else:
+                                    enddate.text = "0000-00-00T00:00:00"
 
-                            # Appel à la fonction sub_unit pour les sous-unités d'archive
-                            archiveunitchild = sub_unit(item_path, data, data_ir, liste_rp)
-                            for child in archiveunitchild:
-                                archiveunitrp.append(child)
-                            # Ajout des sous-unités d'archive à l'unité d'archive parente
+                                # Appel à la fonction sub_unit pour les sous-unités d'archive
+                                archiveunitchild = sub_unit(item_path, data, data_ir, liste_rp)
+                                for child in archiveunitchild:
+                                    archiveunitrp.append(child)
+                                # Ajout des sous-unités d'archive à l'unité d'archive parente
 
-                            # Ajout de l'unité d'archive à DescriptiveMetadata
-                            descriptive_metadata.append(archiveunitrp)
+                                # Ajout de l'unité d'archive à DescriptiveMetadata
+                                descriptive_metadata.append(archiveunitrp)
 
     return root  # Retour de l'arbre XML mis à jour avec les unités d'archive
-
 
 def sub_unit(directory, data, data_ir, liste_rp, parent=None):
     """
@@ -546,17 +570,23 @@ def sub_unit(directory, data, data_ir, liste_rp, parent=None):
         item_path = os.path.join(directory, item)
 
         if os.path.isdir(item_path):
-            # Si l'élément est un répertoire, créer une sous-unité d'archive
-            sub_archive_unit = ET.SubElement(archiveunit, "ArchiveUnit")
-            contentsub = create_archive_unit_dir(item)
-            sub_archive_unit.append(contentsub)
-            # Appel récursif de la fonction pour traiter les sous-répertoires
-            sub_unit(item_path, data, data_ir, liste_rp, sub_archive_unit)
+            if item.startswith('.'):
+                pass
+            else:
+                # Si l'élément est un répertoire, créer une sous-unité d'archive
+                sub_archive_unit = ET.SubElement(archiveunit, "ArchiveUnit")
+                contentsub = create_archive_unit_dir(item)
+                sub_archive_unit.append(contentsub)
+                # Appel récursif de la fonction pour traiter les sous-répertoires
+                sub_unit(item_path, data, data_ir, liste_rp, sub_archive_unit)
 
-        elif os.path.isfile(item_path) and "DS_Store" not in item and "Thumbs" not in item and "BridgeSort" not in item and "._" not in item and "desktop.ini" not in item:
+        elif os.path.isfile(item_path) and "DS_Store" not in item and "Thumbs" not in item and "BridgeSort" not in item and "desktop.ini" not in item:
             # Si l'élément est un fichier valide (et non un fichier système)
-            file_unit = create_archive_unit_file(item, data, item_path)
-            archiveunit.append(file_unit)  # Ajout de l'unité d'archive du fichier à l'unité d'archive parent
+            if item.startswith('.'):
+                pass
+            else:
+                file_unit = create_archive_unit_file(item, data, item_path)
+                archiveunit.append(file_unit)  # Ajout de l'unité d'archive du fichier à l'unité d'archive parent
 
     # Si aucune unité d'archive parent n'a été fournie, retourner les sous-unités d'archive créées
     if parent is None:
@@ -697,6 +727,7 @@ def create_archive_unit_file(title_file, data, item_path):
                     else:
                         pass
 
+
                 # Créer un élément OriginatingAgency contenant l'identifiant du service producteur
                 if contentit.find("OriginatingAgency") is None:
                     originating_agency = ET.SubElement(contentit, "OriginatingAgency")
@@ -816,10 +847,8 @@ def delete_duplicate_dog(arbre):
         binary_data_object = data_object_group.find("BinaryDataObject")
         # Extrait le texte de l'élément MessageDigest
         message_digest = binary_data_object.find("MessageDigest").text
-        # Extrait le texte de l'élément Filename
-        filename = binary_data_object.find(".//Filename").text
-        # Crée un tuple (MessageDigest, Filename) pour identifier l'objet
-        objet = (message_digest, filename)
+
+        objet = message_digest
 
         # Vérifie si cet objet est déjà dans objets_uniques
         if objet in objets_uniques:
@@ -863,6 +892,7 @@ def id_attrib(arbre, archive_unit_id):
     for au in aus:
         # Incrémente le compteur d'identifiants
         id_au = id_au+1
+
         # Assigne un attribut 'id' unique à chaque ArchiveUnit
         au.set("id", "AU"+str(id_au))
 
@@ -1001,6 +1031,7 @@ def copy(target_dir, arbre, data):
 
 
 def main():
+
     input("Bienvenue dans la moulinette de fabrication de SIP pour les reportages photographiques de la Présidence de "
           "la République. Appuyez sur Entrée pour commencer.")
 
