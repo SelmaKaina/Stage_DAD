@@ -8,7 +8,6 @@ import re
 import subprocess
 import json
 import shutil
-import logging
 import sys
 from xml.dom import minidom
 
@@ -115,10 +114,6 @@ def chose_target_dir():
     return path
 
 
-
-
-
-
 def exif_extract(dir_path, liste_rp):
     """
     Utilise la librairie PyExiftool pour extraire les métadonnées internes des photos.
@@ -139,7 +134,10 @@ def exif_extract(dir_path, liste_rp):
                 sys.exit("ANNULATION")
             for item in os.listdir(dir_path):  # Parcours de chaque élément dans le répertoire racine
                 # Vérification si le nom de dossier contient un numéro de reportage
-                if str(rp+" ").lower() in item.lower() or item.lower().endswith(rp.lower()) or str(rp+"_").lower() in item.lower():
+                if (
+                        str(rp+" ").lower() in item.lower() or item.lower().endswith(rp.lower()) or
+                        str(rp+"_").lower() in item.lower()
+                ):
                     item_path = os.path.join(dir_path, item)  # Chemin complet vers le dossier ou fichier
                     # Extraction des métadonnées spécifiques pour les fichiers du dossier
                     exif_data_list = et.execute_json(
@@ -157,7 +155,6 @@ def exif_extract(dir_path, liste_rp):
     return data  # Retourner la liste des métadonnées extraites pour tous les fichiers concernés
 
 
-
 def siegfried(dir_path, liste_rp):
     """
     Utilise l'outil Siegfried pour extraire les métadonnées de format des fichiers.
@@ -171,7 +168,10 @@ def siegfried(dir_path, liste_rp):
     for rp in liste_rp:
         # Parcours de chaque élément (fichier ou dossier) dans le répertoire racine
         for item in os.listdir(dir_path):
-            if str(rp+" ").lower() in item.lower() or item.lower().endswith(rp.lower()) or str(rp+"_").lower() in item.lower():
+            if (
+                    str(rp+" ").lower() in item.lower() or item.lower().endswith(rp.lower()) or
+                    str(rp+"_").lower() in item.lower()
+            ):
                 item_path = os.path.join(dir_path, item)  # Chemin complet vers le dossier ou fichier
                 # Appel à Siegfried pour obtenir les métadonnées de format au format JSON
                 md_format = subprocess.run(["sf", "-hash", "sha512", "-json", item_path], capture_output=True,
@@ -297,11 +297,11 @@ def create_dataobjectgroup(arbre, directory, liste_rp):
         Crée l'élément <DataObjectPackage> et un élément <DataObjectGroup> pour chaque fichier correspondant aux
         reportages spécifiés.
 
-        :param xml.etree.ElementTree.Element arbre: l'élément racine de l'arbre XML dans lequel les groupes d'objets de données seront ajoutés.
-        :param str directory: le chemin vers le répertoire racine contenant les dossiers des reportages.
-        :param list liste_rp: la liste des numéros des reportages à inclure dans le SIP.
+        :param ElementTree Element arbre: L'élément racine de l'arbre XML.
+        :param str directory: Le chemin vers le répertoire racine contenant les dossiers des reportages.
+        :param list liste_rp: La liste des numéros des reportages à inclure dans le SIP.
 
-        :return: xml.etree.ElementTree.Element - l'élément racine XML mis à jour avec les groupes d'objets techniques ajoutés.
+        :return: ElementTree Element - l'élément racine XML mis à jour avec les groupes d'objets techniques ajoutés.
         """
     root = arbre  # Utilisation de l'arbre XML passé en paramètre comme racine
 
@@ -316,9 +316,16 @@ def create_dataobjectgroup(arbre, directory, liste_rp):
             item = dirpath + "/" + i  # Chemin complet du fichier
             for num in liste_rp:
                 # Vérification si le numéro de reportage est dans le chemin du fichier
-                if str(num+" ").lower() in item.lower() or str(num+"/").lower() in item.lower() or str(num+"_").lower() in item.lower():
+                if (
+                        str(num+" ").lower() in item.lower() or str(num+"/").lower() in item.lower() or
+                        str(num+"_").lower() in item.lower()
+                ):
                     # Exclusions de certains fichiers non pertinents (fichiers système ou masqués)
-                    if "DS_Store" not in item and "Thumbs" not in item and "BridgeSort" not in item and "PM_lock" not in item and "desktop.ini" not in item and "._" not in item and "/." not in item:
+                    if (
+                            "DS_Store" not in item and "Thumbs" not in item and "BridgeSort" not in item and
+                            "PM_lock" not in item and "desktop.ini" not in item and
+                            "._" not in item and "/." not in item
+                    ):
                         # Création de l'élément DataObjectGroup sous DataObjectPackage et de ses descendants
                         data_object_group = ET.SubElement(data_object_package, "DataObjectGroup")
                         binary_data_object = ET.SubElement(data_object_group, "BinaryDataObject")
@@ -341,11 +348,11 @@ def package_metadata(arbre, data):
     """
     Complète les métadonnées des objets techniques dans l'arbre XML avec les informations fournies dans data.
 
-    :param xml.etree.ElementTree.Element arbre: l'élément racine de l'arbre XML à mettre à jour.
-    :param list[dict] data: une liste de dictionnaires contenant les métadonnées des fichiers (fusion des exports
+    :param xml.etree.ElementTree.Element arbre: L'élément racine de l'arbre XML à mettre à jour.
+    :param list[dict] data: Une liste de dictionnaires contenant les métadonnées des fichiers (fusion des exports
     Siegfried et Exiftool).
 
-    :return: xml.etree.ElementTree.Element - l'élément racine XML mis à jour avec les métadonnées des objets techniques.
+    :return: ElementTree Element - l'élément racine XML mis à jour avec les métadonnées des objets techniques.
     """
     root = arbre  # Utilisation de l'arbre XML passé en paramètre comme racine
 
@@ -373,7 +380,7 @@ def package_metadata(arbre, data):
                         modif_date = file.get("File:FileModifyDate")  # Récupération de la date de dernière modification
                         # Extraction de la date au format attendu
                         match = re.match(r"(\d{4}:\d{2}:\d{2}\s\d{2}:\d{2}:\d{2})(\\.\d+)?([-+]\d{2}:\d{2})?",
-                            modif_date)
+                                         modif_date)
                         if match:
                             modif_date = match.group(1)
                             # Conversion de la date en format ISO 8601
@@ -440,7 +447,10 @@ def ua_rp(directory, data_ir, arbre_rp, data, liste_rp, rattachement):
             for item in os.listdir(directory):
                 for RP in data_ir:
                     if num == RP[0]:
-                        if str(num+" ").lower() in item.lower() or item.lower().endswith(num.lower()) or str(num+"_").lower() in item.lower():
+                        if (
+                                str(num+" ").lower() in item.lower() or item.lower().endswith(num.lower()) or
+                                str(num+"_").lower() in item.lower()
+                        ):
                             print(num)  # Affichage du nom du fichier pour vérification
                             item_path = os.path.join(directory, item)
                             if os.path.isdir(item_path):
@@ -469,7 +479,7 @@ def ua_rp(directory, data_ir, arbre_rp, data, liste_rp, rattachement):
                                 if RP[2] is not None:
                                     dtd = datetime.strptime(RP[2], "%d.%m.%Y")
                                     dtd = dtd.strftime("%Y-%m-%dT%H:%M:%S")
-                                    startdate.text = dtd  # Date de début du reportage issue du csv de métadonnées externes
+                                    startdate.text = dtd  # Date de début du reportage issue du csv
                                 else:
                                     startdate.text = "0000-00-00T00:00:00"
                                 enddate = ET.SubElement(contentrp, "EndDate")
@@ -494,7 +504,10 @@ def ua_rp(directory, data_ir, arbre_rp, data, liste_rp, rattachement):
             for item in os.listdir(directory):
                 for RP in data_ir:
                     if num == RP[0]:
-                        if str(num+" ").lower() in item.lower() or item.lower().endswith(num.lower()) or str(num+"_").lower() in item.lower():
+                        if (
+                                str(num+" ").lower() in item.lower() or item.lower().endswith(num.lower()) or
+                                str(num+"_").lower() in item.lower()
+                        ):
                             print(num)  # Affichage du nom du fichier pour vérification
                             item_path = os.path.join(directory, item)
                             if os.path.isdir(item_path):
@@ -523,7 +536,7 @@ def ua_rp(directory, data_ir, arbre_rp, data, liste_rp, rattachement):
                                 if RP[2] is not None:
                                     dtd = datetime.strptime(RP[2], "%d.%m.%Y")
                                     dtd = dtd.strftime("%Y-%m-%dT%H:%M:%S")
-                                    startdate.text = dtd  # Date de début du reportage issue du csv de métadonnées externes
+                                    startdate.text = dtd  # Date de début du reportage issue du csv
                                 else:
                                     startdate.text = "0000-00-00T00:00:00"
                                 enddate = ET.SubElement(contentrp, "EndDate")
@@ -545,20 +558,21 @@ def ua_rp(directory, data_ir, arbre_rp, data, liste_rp, rattachement):
 
     return root  # Retour de l'arbre XML mis à jour avec les unités d'archive
 
+
 def sub_unit(directory, data, data_ir, liste_rp, parent=None):
     """
     Crée des unités d'archive pour les fichiers en appelant la fonction et sous-répertoires dans le répertoire spécifié,
-    et les ajoute à l'unité d'archive parent.
+    et les ajoute à l'unité d'archive parente.
 
-    :param str directory: le chemin du répertoire contenant les fichiers et sous-répertoires.
-    :param list[dict] data: une liste de dictionnaires contenant les métadonnées des fichiers (fusion des exports
+    :param str directory: Le chemin du répertoire contenant les fichiers et sous-répertoires.
+    :param list[dict] data: Une liste de dictionnaires contenant les métadonnées des fichiers (fusion des exports
     Siegfried et Exiftool).
-    :param list[list] data_ir: une liste de liste, chacune contenant les métadonnées externes d'un reportage.
-    :param list liste_rp: une liste des numéros des reportages à traiter.
-    :param xml.etree.ElementTree.Element parent: l'unité d'archive parent à laquelle ajouter les sous-unités, ou None
+    :param list[list] data_ir: Une liste de liste, chacune contenant les métadonnées externes d'un reportage.
+    :param list liste_rp: Une liste des numéros des reportages à traiter.
+    :param xml.etree.ElementTree.Element parent: L'unité d'archive parente à laquelle ajouter les sous-unités, ou None
     pour créer une nouvelle unité d'archive racine.
 
-    :return: list - une liste des sous-unités d'archive
+    :return: Liste - une liste des sous-unités d'archive
     """
     if parent is None:
         archiveunit = ET.Element("ArchiveUnit")  # Création de l'élément ArchiveUnit
@@ -580,7 +594,10 @@ def sub_unit(directory, data, data_ir, liste_rp, parent=None):
                 # Appel récursif de la fonction pour traiter les sous-répertoires
                 sub_unit(item_path, data, data_ir, liste_rp, sub_archive_unit)
 
-        elif os.path.isfile(item_path) and "DS_Store" not in item and "Thumbs" not in item and "BridgeSort" not in item and "desktop.ini" not in item:
+        elif (
+                os.path.isfile(item_path) and "DS_Store" not in item and "Thumbs" not in item and
+                "BridgeSort" not in item and "desktop.ini" not in item
+        ):
             # Si l'élément est un fichier valide (et non un fichier système)
             if item.startswith('.'):
                 pass
@@ -692,7 +709,7 @@ def create_archive_unit_file(title_file, data, item_path):
                         else:
                             pass
 
-                # Ajout d'éléments Coverage si des informations de localisation sont présentes dans les métadonnées internes du fichier
+                # Ajout d'éléments Coverage si des informations de localisation sont présentes
                 if contentit.find("Coverage") is None:
                     # Chercher si des champs de localisation sont renseignés dans les métadonnées internes du fichier
                     if file.get("XMP:Country" or "IPTC:Country-PrimaryLocationName" or "XMP:City" or "IPTC:City"):
@@ -726,7 +743,6 @@ def create_archive_unit_file(title_file, data, item_path):
                                 pass
                     else:
                         pass
-
 
                 # Créer un élément OriginatingAgency contenant l'identifiant du service producteur
                 if contentit.find("OriginatingAgency") is None:
@@ -925,10 +941,10 @@ def id_attrib(arbre, archive_unit_id):
 
                 # Vérifie si le MessageDigest correspond au hash temporaire
                 message_digest = obj.find(".//MessageDigest").text
-                id = obj.attrib['id']
+                obj_id = obj.attrib['id']
                 if temp_hash == message_digest:
                     # Met à jour DataObjectGroupReferenceId avec l'identifiant du DataObjectGroup correspondant
-                    data_object_group_ref_id.text = id
+                    data_object_group_ref_id.text = obj_id
 
     return root  # Retourner l'arbre modifié
 
@@ -939,7 +955,7 @@ def create_management_metadata(arbre):
 
     :param xml.etree.ElementTree.Element arbre: L'arbre XML à mettre à jour.
 
-    :return: xml.etree.ElementTree.Element - L'arbre XML avec les métadonnées descriptives ajoutées ou mises à jour.
+    :return: ElementTree Element - L'arbre XML avec les métadonnées descriptives ajoutées ou mises à jour.
     """
     # Racine de l'arbre XML
     root = arbre
