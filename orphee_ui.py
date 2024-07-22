@@ -1,7 +1,6 @@
 import os
 from datetime import datetime
 import xml.etree.ElementTree as ET
-from tkinter import filedialog
 import csv
 from exiftool import ExifTool
 import re
@@ -13,7 +12,7 @@ import sys
 from xml.dom import minidom
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QLineEdit, QVBoxLayout, QWidget, QPushButton, QCheckBox, QFileDialog,
-    QHBoxLayout, QTextEdit, QGridLayout, QScrollArea, QComboBox
+    QHBoxLayout, QGridLayout, QScrollArea, QComboBox
 )
 from PySide6.QtGui import QIcon
 from PySide6.QtCore import Qt
@@ -31,9 +30,56 @@ date_ajd = datetime.today().strftime("%Y-%m-%dT%H:%M:%S")
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.initUI()
 
-    def initUI(self):
+        # Définir tous les attributs d'instance ici
+        self.num_entree = None
+        self.entree_input = None
+        self.num_paquet = None
+        self.paquet_input = None
+        self.versement_label = None
+        self.versement_input = None
+        self.archival_agency_identifier_label = None
+        self.archival_agency_identifier_input = None
+        self.transferring_agency_identifier_label = None
+        self.transferring_agency_identifier_input = None
+        self.originating_agency_identifier_label = None
+        self.originating_agency_identifier_input = None
+        self.submission_agency_identifier_label = None
+        self.submission_agency_identifier_input = None
+        self.archival_agreement_label = None
+        self.archival_agreement_input = None
+        self.authorized_agent_activity_label = None
+        self.authorized_agent_activity_input = None
+        self.authorized_agent_mandate_label = None
+        self.authorized_agent_mandate_input = None
+        self.archival_profile_label = None
+        self.archival_profile_input = None
+        self.acquisition_information_label = None
+        self.acquisition_information_input = None
+        self.legal_status_label = None
+        self.legal_status_input = None
+        self.metadata_checkboxes = []
+        self.optional_checkbox = None
+        self.rattachement_label = None
+        self.rattachement_input = None
+        self.nom_rattachement_label = None
+        self.nom_rattachement_input = None
+        self.entree_dir_button = None
+        self.entree_dir_label = None
+        self.cible_dir_button = None
+        self.cible_dir_label = None
+        self.csv_file_button = None
+        self.csv_file_label = None
+        self.txt_file_button = None
+        self.txt_file_label = None
+        self.submit_button = None
+
+        self.initui()
+
+    def initui(self):
+        """
+        Initialise l'interface utilisateur de l'application ORPhEE.
+        """
         self.setWindowTitle("ORPhEE")
         # Style pour l'ensemble de l'application
         self.setStyleSheet("""
@@ -86,8 +132,8 @@ class MainWindow(QMainWindow):
         self.submission_agency_identifier_label = QLabel("SubmissionAgency :")
         self.submission_agency_identifier_label.setStyleSheet("color: #865746;")
         self.submission_agency_identifier_input = QLineEdit()
-        self.submission_agency_identifier_input.setPlaceholderText("Identifiant du service versant responsable du transfert de données.")
-
+        self.submission_agency_identifier_input.setPlaceholderText(
+            "Identifiant du service versant responsable du transfert de données.")
 
         self.archival_agreement_label = QLabel("ArchivalAgreement :")
         self.archival_agreement_label.setStyleSheet("color: #865746;")
@@ -97,23 +143,25 @@ class MainWindow(QMainWindow):
         self.authorized_agent_activity_label = QLabel("AuthorizedAgent Activity :")
         self.authorized_agent_activity_label.setStyleSheet("color: #865746;")
         self.authorized_agent_activity_input = QLineEdit()
-        self.authorized_agent_activity_input.setPlaceholderText("Activité de la personne détenant des droits sur la photo (ex : Photographe).")
+        self.authorized_agent_activity_input.setPlaceholderText(
+            "Activité de la personne détenant des droits sur la photo (ex : Photographe).")
 
         self.authorized_agent_mandate_label = QLabel("AuthorizedAgent Mandate :")
         self.authorized_agent_mandate_label.setStyleSheet("color: #865746;")
         self.authorized_agent_mandate_input = QLineEdit()
-        self.authorized_agent_mandate_input.setPlaceholderText("Statut du détenteur de droits (ex : Photographe service public, d'agence, privé).")
+        self.authorized_agent_mandate_input.setPlaceholderText(
+            "Statut du détenteur de droits (ex : Photographe service public, d'agence, privé).")
 
         self.archival_profile_label = QLabel("ArchivalProfile :")
         self.archival_profile_label.setStyleSheet("color: #865746;")
         self.archival_profile_input = QLineEdit()
-        self.archival_profile_input.setPlaceholderText("Référence au profil d’archivage applicable aux unités d’archives.")
+        self.archival_profile_input.setPlaceholderText(
+            "Référence au profil d’archivage applicable aux unités d’archives.")
 
         self.acquisition_information_label = QLabel("AcquisitionInformation :")
         self.acquisition_information_label.setStyleSheet("color: #865746;")
         self.acquisition_information_input = QLineEdit()
         self.acquisition_information_input.setPlaceholderText("Référence aux modalités d'entrée des archives.")
-
 
         self.legal_status_label = QLabel("LegalStatus :")
         self.legal_status_label.setStyleSheet("color: #865746;")
@@ -257,7 +305,6 @@ class MainWindow(QMainWindow):
         grid_layout.addWidget(metadata_label, 14, 0, 1, 3, alignment=Qt.AlignmentFlag.AlignCenter)
 
         row = 17
-        col = 0
         # Ajouter les checkboxes dans des QVBoxLayout pour les centrer en colonnes
         checkbox_column1 = QVBoxLayout()
         checkbox_column2 = QVBoxLayout()
@@ -358,22 +405,40 @@ class MainWindow(QMainWindow):
         self.nom_rattachement_input.setVisible(is_checked)
 
     def select_entree_dir(self):
+        """
+        Ouvre une boîte de dialogue pour sélectionner le répertoire contenant les reportages
+        et met à jour le champ correspondant avec le chemin sélectionné.
+        """
         directory = QFileDialog.getExistingDirectory(self, "Sélectionner le répertoire contenant les reportages")
         if directory:
             self.entree_dir_label.setText(directory)
 
     def select_cible_dir(self):
+        """
+        Ouvre une boîte de dialogue pour sélectionner le répertoire où sera créé le SIP
+        et met à jour le champ correspondant avec le chemin sélectionné.
+        """
         directory = QFileDialog.getExistingDirectory(self, "Sélectionner le répertoire où sera créé le SIP")
         if directory:
             self.cible_dir_label.setText(directory)
 
     def select_csv_file(self):
-        file, _ = QFileDialog.getOpenFileName(self, "Sélectionner l'instrument de recherche (CSV)", "", "CSV Files (*.csv)")
+        """
+        Ouvre une boîte de dialogue pour sélectionner le fichier CSV utilisé comme instrument de recherche,
+        et met à jour le champ correspondant avec le chemin du fichier sélectionné.
+        """
+        file, _ = QFileDialog.getOpenFileName(self, "Sélectionner l'instrument de recherche (CSV)", "",
+                                              "CSV Files (*.csv)")
         if file:
             self.csv_file_label.setText(file)
 
     def select_txt_file(self):
-        file, _ = QFileDialog.getOpenFileName(self, "Sélectionner la liste des reportages (TXT)", "", "Text Files (*.txt)")
+        """
+        Ouvre une boîte de dialogue pour sélectionner le fichier texte contenant la liste des reportages,
+        et met à jour le champ correspondant avec le chemin du fichier sélectionné.
+        """
+        file, _ = QFileDialog.getOpenFileName(self, "Sélectionner la liste des reportages (TXT)", "",
+                                              "Text Files (*.txt)")
         if file:
             self.txt_file_label.setText(file)
 
@@ -382,7 +447,8 @@ class MainWindow(QMainWindow):
         try:
             formulaire = self.submit()
 
-            archival_agency_archive_unit_identifier = formulaire["Num_entree"] + "_" + formulaire["Num_paquet"] + "_"
+            archival_agency_archive_unit_identifier = (str(formulaire["Num_entree"]) + "_" +
+                                                       str(formulaire["Num_paquet"]) + "_")
             archive_unit_id = archival_agency_archive_unit_identifier
 
             if formulaire["Rattachement"] is not None:
@@ -438,8 +504,8 @@ class MainWindow(QMainWindow):
             print("Bravo, le paquet est terminé !")
             input("Appuyez sur Entrée pour fermer l'application.")
             QApplication.instance().quit()  # Quitter l'application PyQt
-        except Exception as e:
-            print("error : ",e)
+        except Exception as excep:
+            print("error : ", excep)
             input("Appuyez sur Entrée pour fermer l'application.")
             QApplication.instance().quit()  # Quitter l'application PyQt
 
@@ -468,7 +534,7 @@ class MainWindow(QMainWindow):
             "TransferringAgency_Identifier": self.transferring_agency_identifier_input.text(),
             "OriginatingAgency_Identifier": self.originating_agency_identifier_input.text(),
             "SubmissionAgency_Identifier": self.submission_agency_identifier_input.text(),
-            "ArchivalAgreement" : self.archival_agreement_input.text(),
+            "ArchivalAgreement": self.archival_agreement_input.text(),
             "AuthorizedAgent_Activity": self.authorized_agent_activity_input.text(),
             "AuthorizedAgent_Mandate": self.authorized_agent_mandate_input.text(),
             "ArchivalProfile": self.archival_profile_input.text(),
@@ -484,11 +550,8 @@ class MainWindow(QMainWindow):
 
         if rattachement_data is not None:
             data["Rattachement"] = rattachement_data
-        else:
-            data["Rattachement"] is None
 
         self.close()
-
 
         return data
 
@@ -539,10 +602,11 @@ def chose_target_dir(cible_dir):
 def exif_extract(dir_path, liste_rp, formulaire):
     """
     Utilise la librairie PyExiftool pour extraire les métadonnées internes des photos.
-    :param str dir_path: le chemin vers le répertoire "racine" contenant les reportages.
-    :param list liste_rp: la liste des numéros des reportages à ajouter au SIP.
+    :param str dir_path: Le chemin vers le répertoire "racine" contenant les reportages.
+    :param list liste_rp: La liste des numéros des reportages à ajouter au SIP.
+    :param dict formulaire: Formulaire contenant les informations saisies par l'utilisateur.
 
-    :return: list[dict] - une liste de dictionnaires, chaque dictionnaire contenant les métadonnées extraites
+    :return: List[dict] - une liste de dictionnaires, chaque dictionnaire contenant les métadonnées extraites
     pour un fichier.
     """
     data = []  # Initialisation de la liste qui va contenir les métadonnées extraites
@@ -556,7 +620,10 @@ def exif_extract(dir_path, liste_rp, formulaire):
                 sys.exit("ANNULATION")
             for item in os.listdir(dir_path):  # Parcours de chaque élément dans le répertoire racine
                 # Vérification si le nom de dossier contient un numéro de reportage
-                if str(rp+" ").lower() in item.lower() or item.lower().endswith(rp.lower()) or str(rp+"_").lower() in item.lower():
+                if (
+                        str(rp+" ").lower() in item.lower() or item.lower().endswith(rp.lower()) or
+                        str(rp+"_").lower() in item.lower()
+                ):
                     item_path = os.path.join(dir_path, item)  # Chemin complet vers le dossier ou fichier
                     # Extraction des métadonnées spécifiques pour les fichiers du dossier
                     exif_data_list = et.execute_json(
@@ -638,8 +705,10 @@ def creer_root(value, formulaire):
     """
     Crée l'élément XML racine et l'en-tête du manifest.
 
-    :param str value: la valeur textuelle des balises <Comment> et <Message Identifier>.
-    :return: xml.etree.ElementTree.Element - l'élément racine XML créé.
+    :param str value: La valeur textuelle des balises <Comment> et <Message Identifier>.
+    :param dict formulaire: Formulaire contenant les informations saisies par l'utilisateur.
+
+    :return: ElementTree Element - l'élément racine XML créé.
     """
     root = ET.Element("ArchiveTransfer")  # Création de l'élément racine XML 'ArchiveTransfer'
 
@@ -711,11 +780,11 @@ def create_dataobjectgroup(arbre, directory, liste_rp):
         Crée l'élément <DataObjectPackage> et un élément <DataObjectGroup> pour chaque fichier correspondant aux
         reportages spécifiés.
 
-        :param xml.etree.ElementTree.Element arbre: l'élément racine de l'arbre XML dans lequel les groupes d'objets de données seront ajoutés.
-        :param str directory: le chemin vers le répertoire racine contenant les dossiers des reportages.
-        :param list liste_rp: la liste des numéros des reportages à inclure dans le SIP.
+        :param ElementTree Element arbre: L'élément racine de l'arbre XML.
+        :param str directory: Le chemin vers le répertoire racine contenant les dossiers des reportages.
+        :param list liste_rp: La liste des numéros des reportages à inclure dans le SIP.
 
-        :return: xml.etree.ElementTree.Element - l'élément racine XML mis à jour avec les groupes d'objets techniques ajoutés.
+        :return: ElementTree Element - l'élément racine XML mis à jour avec les groupes d'objets techniques ajoutés.
         """
     root = arbre  # Utilisation de l'arbre XML passé en paramètre comme racine
 
@@ -732,7 +801,11 @@ def create_dataobjectgroup(arbre, directory, liste_rp):
                 # Vérification si le numéro de reportage est dans le chemin du fichier
                 if str(num+" ").lower() in item.lower() or str(num+"/").lower() in item.lower():
                     # Exclusions de certains fichiers non pertinents (fichiers système ou masqués)
-                    if "DS_Store" not in item and "Thumbs" not in item and "BridgeSort" not in item and "PM_lock" not in item and "desktop.ini" not in item and "._" not in item and "/." not in item:
+                    if (
+                            "DS_Store" not in item and "Thumbs" not in item and "BridgeSort" not in item and
+                            "PM_lock" not in item and "desktop.ini" not in item and
+                            "._" not in item and "/." not in item
+                    ):
                         # Création de l'élément DataObjectGroup sous DataObjectPackage et de ses descendants
                         data_object_group = ET.SubElement(data_object_package, "DataObjectGroup")
                         binary_data_object = ET.SubElement(data_object_group, "BinaryDataObject")
@@ -788,7 +861,7 @@ def package_metadata(arbre, data):
                         modif_date = file.get("File:FileModifyDate")  # Récupération de la date de dernière modification
                         # Extraction de la date au format attendu
                         match = re.match(r"(\d{4}:\d{2}:\d{2}\s\d{2}:\d{2}:\d{2})(\\.\d+)?([-+]\d{2}:\d{2})?",
-                            modif_date)
+                                         modif_date)
                         if match:
                             modif_date = match.group(1)
                             # Conversion de la date en format ISO 8601
@@ -820,15 +893,16 @@ def ua_rp(directory, data_ir, arbre_rp, data, liste_rp, rattachement, formulaire
     Crée des unités d'archive pour chaque reportage et appelle la fonction sub_unit() pour les UA de niveau inférieur,
     puis les ajoute à l'arbre XML.
 
-    :param str directory: le chemin du répertoire contenant les reportages.
-    :param list[list] data_ir: une liste de liste, chacune contenant les métadonnées externes d'un reportage.
-    :param xml.etree.ElementTree.Element arbre_rp: l'arbre XML mis à jour.
-    :param list[dict] data: une liste de dictionnaires contenant les métadonnées des fichiers (fusion des exports
+    :param str directory: Le chemin du répertoire contenant les reportages.
+    :param list[list] data_ir: Une liste de liste, chacune contenant les métadonnées externes d'un reportage.
+    :param xml.etree.ElementTree.Element arbre_rp: L'arbre XML mis à jour.
+    :param list[dict] data: Une liste de dictionnaires contenant les métadonnées des fichiers (fusion des exports
     Siegfried et Exiftool).
-    :param list liste_rp: une liste des numéros des reportages à ajouter au SIP.
-    :param list rattachement: une liste contenant les informations de rattachement, ou None.
+    :param list liste_rp: Une liste des numéros des reportages à ajouter au SIP.
+    :param list rattachement: Une liste contenant les informations de rattachement, ou None.
+    :param dict formulaire: Formulaire contenant les informations saisies par l'utilisateur.
 
-    :return: xml.etree.ElementTree.Element - l'élément racine XML mis à jour.
+    :return: ElementTree Element - l'élément racine XML mis à jour.
     """
     root = arbre_rp  # Utilisation de l'arbre XML passé en paramètre comme racine
     data_object_package = root.find("DataObjectPackage")  # Recherche de l'élément DataObjectPackage
@@ -855,7 +929,10 @@ def ua_rp(directory, data_ir, arbre_rp, data, liste_rp, rattachement, formulaire
             for item in os.listdir(directory):
                 for RP in data_ir:
                     if num == RP[0]:
-                        if str(num+" ").lower() in item.lower() or item.lower().endswith(num.lower()) or str(num+"_").lower() in item.lower():
+                        if (
+                                str(num+" ").lower() in item.lower() or item.lower().endswith(num.lower()) or
+                                str(num+"_").lower() in item.lower()
+                        ):
                             item_path = os.path.join(directory, item)
                             if os.path.isdir(item_path):
                                 # Création d'une nouvelle unité d'archive pour chaque reportage
@@ -876,14 +953,16 @@ def ua_rp(directory, data_ir, arbre_rp, data, liste_rp, rattachement, formulaire
                                 description.text = str("Reportage n°"+RP[0])
                                 # Identifiant du service producteur et versant
                                 originating_agency = ET.SubElement(contentrp, "OriginatingAgency")
-                                ET.SubElement(originating_agency, "Identifier").text = formulaire["OriginatingAgency_Identifier"]
+                                ET.SubElement(originating_agency, "Identifier").text = (
+                                    formulaire)["OriginatingAgency_Identifier"]
                                 submission_agency = ET.SubElement(contentrp, "SubmissionAgency")
-                                ET.SubElement(submission_agency, "Identifier").text = formulaire["SubmissionAgency_Identifier"]
+                                ET.SubElement(submission_agency, "Identifier").text = (
+                                    formulaire)["SubmissionAgency_Identifier"]
                                 startdate = ET.SubElement(contentrp, "StartDate")
                                 if RP[2] is not None:
                                     dtd = datetime.strptime(RP[2], "%d.%m.%Y")
                                     dtd = dtd.strftime("%Y-%m-%dT%H:%M:%S")
-                                    startdate.text = dtd  # Date de début du reportage issue du csv de métadonnées externes
+                                    startdate.text = dtd  # Date de début du reportage issue du csv
                                 else:
                                     startdate.text = "0000-00-00T00:00:00"
                                 enddate = ET.SubElement(contentrp, "EndDate")
@@ -908,7 +987,10 @@ def ua_rp(directory, data_ir, arbre_rp, data, liste_rp, rattachement, formulaire
             for item in os.listdir(directory):
                 for RP in data_ir:
                     if num == RP[0]:
-                        if str(num+" ").lower() in item.lower() or item.lower().endswith(num.lower()) or str(num+"_").lower() in item.lower():
+                        if (
+                                str(num+" ").lower() in item.lower() or item.lower().endswith(num.lower()) or
+                                str(num+"_").lower() in item.lower()
+                        ):
                             print(item)  # Affichage du nom du fichier pour vérification
                             item_path = os.path.join(directory, item)
                             if os.path.isdir(item_path):
@@ -930,14 +1012,16 @@ def ua_rp(directory, data_ir, arbre_rp, data, liste_rp, rattachement, formulaire
                                 description.text = str("Reportage n°"+RP[0])
                                 # Identifiant du service producteur et versant
                                 originating_agency = ET.SubElement(contentrp, "OriginatingAgency")
-                                ET.SubElement(originating_agency, "Identifier").text = formulaire["OriginatingAgency_Identifier"]
+                                ET.SubElement(originating_agency, "Identifier").text = (
+                                    formulaire)["OriginatingAgency_Identifier"]
                                 submission_agency = ET.SubElement(contentrp, "SubmissionAgency")
-                                ET.SubElement(submission_agency, "Identifier").text = formulaire["SubmissionAgency_Identifier"]
+                                ET.SubElement(submission_agency, "Identifier").text = (
+                                    formulaire)["SubmissionAgency_Identifier"]
                                 startdate = ET.SubElement(contentrp, "StartDate")
                                 if RP[2] is not None:
                                     dtd = datetime.strptime(RP[2], "%d.%m.%Y")
                                     dtd = dtd.strftime("%Y-%m-%dT%H:%M:%S")
-                                    startdate.text = dtd  # Date de début du reportage issue du csv de métadonnées externes
+                                    startdate.text = dtd  # Date de début du reportage issue du csv
                                 else:
                                     startdate.text = "0000-00-00T00:00:00"
                                 enddate = ET.SubElement(contentrp, "EndDate")
@@ -972,6 +1056,7 @@ def sub_unit(directory, data, data_ir, liste_rp, formulaire, parent=None):
     :param list liste_rp: une liste des numéros des reportages à traiter.
     :param xml.etree.ElementTree.Element parent: l'unité d'archive parent à laquelle ajouter les sous-unités, ou None
     pour créer une nouvelle unité d'archive racine.
+    :param dict formulaire: Formulaire contenant les informations saisies par l'utilisateur.
 
     :return: list - une liste des sous-unités d'archive
     """
@@ -995,7 +1080,10 @@ def sub_unit(directory, data, data_ir, liste_rp, formulaire, parent=None):
                 # Appel récursif de la fonction pour traiter les sous-répertoires
                 sub_unit(item_path, data, data_ir, liste_rp, formulaire, sub_archive_unit)
 
-        elif os.path.isfile(item_path) and "DS_Store" not in item and "Thumbs" not in item and "BridgeSort" not in item and "desktop.ini" not in item:
+        elif (
+                os.path.isfile(item_path) and "DS_Store" not in item and "Thumbs" not in item and
+                "BridgeSort" not in item and "desktop.ini" not in item
+        ):
             # Si l'élément est un fichier valide (et non un fichier système)
             if item.startswith('.'):
                 pass
@@ -1003,7 +1091,7 @@ def sub_unit(directory, data, data_ir, liste_rp, formulaire, parent=None):
                 file_unit = create_archive_unit_file(item, data, item_path, formulaire)
                 archiveunit.append(file_unit)  # Ajout de l'unité d'archive du fichier à l'unité d'archive parent
 
-    # Si aucune unité d'archive parent n'a été fournie, retourner les sous-unités d'archive créées
+    # Si aucune unité d'archive parente n'a été fournie, retourne les sous-unités d'archive créées
     if parent is None:
         au_child = archiveunit.findall("./ArchiveUnit")
         return au_child
@@ -1013,9 +1101,10 @@ def create_archive_unit_dir(title_dir, formulaire):
     """
     Crée le contenu d'une unité d'archive pour un répertoire.
 
-    :param str title_dir: le titre du répertoire à utiliser comme titre de l'unité d'archive.
+    :param str title_dir: Le titre du répertoire à utiliser comme titre de l'unité d'archive.
+    :param dict formulaire: Formulaire contenant les informations saisies par l'utilisateur.
 
-    :return: xml.etree.ElementTree.Element - un élément XML représentant le contenu de l'unité d'archive pour le
+    :return: ElementTree Element - un élément XML représentant le contenu de l'unité d'archive pour le
     répertoire.
     """
     # Création d'un élément Content contenant les métadonnées relatives au sous-dossier
@@ -1025,9 +1114,11 @@ def create_archive_unit_dir(title_dir, formulaire):
     title_element.text = title_dir  # Titre du sous-dossier
     ET.SubElement(contentdir, "ArchivalAgencyArchiveUnitIdentifier")
     originating_agency = ET.SubElement(contentdir, "OriginatingAgency")
-    ET.SubElement(originating_agency, "Identifier").text = formulaire["OriginatingAgency_Identifier"]  # Identifiant du service producteur
+    ET.SubElement(originating_agency, "Identifier").text = (
+        formulaire)["OriginatingAgency_Identifier"]  # Identifiant du service producteur
     submission_agency = ET.SubElement(contentdir, "SubmissionAgency")
-    ET.SubElement(submission_agency, "Identifier").text = formulaire["SubmissionAgency_Identifier"]  # Identifiant du service versant
+    ET.SubElement(submission_agency, "Identifier").text = (
+        formulaire)["SubmissionAgency_Identifier"]  # Identifiant du service versant
 
     return contentdir  # Retourner le Content créé pour l'ajouter à l'UA correspondante, crée par la fonction sub_unit()
 
@@ -1040,6 +1131,7 @@ def create_archive_unit_file(title_file, data, item_path, formulaire):
     :param list[dict] data: une liste de dictionnaires contenant les métadonnées des fichiers (fusion des exports
     Siegfried et Exiftool).
     :param str item_path: Le chemin complet du fichier.
+    :param dict formulaire: Formulaire contenant les informations saisies par l'utilisateur.
 
     :return: xml.etree.ElementTree.Element - L'élément XML ArchiveUnit et ses descendants, contenant les métadonnées du
     fichier.
@@ -1111,7 +1203,7 @@ def create_archive_unit_file(title_file, data, item_path, formulaire):
                         else:
                             pass
 
-                # Ajout d'éléments Coverage si des informations de localisation sont présentes dans les métadonnées internes du fichier
+                # Ajout d'éléments Coverage si des informations de localisation sont présentes
                 if contentit.find("Coverage") is None:
                     # Chercher si des champs de localisation sont renseignés dans les métadonnées internes du fichier
                     if file.get("XMP:Country" or "IPTC:Country-PrimaryLocationName" or "XMP:City" or "IPTC:City"):
@@ -1149,12 +1241,14 @@ def create_archive_unit_file(title_file, data, item_path, formulaire):
                 # Créer un élément OriginatingAgency contenant l'identifiant du service producteur
                 if contentit.find("OriginatingAgency") is None:
                     originating_agency = ET.SubElement(contentit, "OriginatingAgency")
-                    ET.SubElement(originating_agency, "Identifier").text = formulaire["OriginatingAgency_Identifier"]
+                    ET.SubElement(originating_agency, "Identifier").text = (
+                        formulaire)["OriginatingAgency_Identifier"]
 
                 # Créer un élément SubmissionAgency contenant l'identifiant du service versant
                 if contentit.find("SubmissionAgency") is None:
                     submission_agency = ET.SubElement(contentit, "SubmissionAgency")
-                    ET.SubElement(submission_agency, "Identifier").text = formulaire["SubmissionAgency_Identifier"]
+                    ET.SubElement(submission_agency, "Identifier").text = (
+                        formulaire)["SubmissionAgency_Identifier"]
 
                 # Ajout d'éléments AuthorizedAgent si le nom du photographe est présent dans les métadonnées du fichier
                 if contentit.find("AuthorizedAgent") is None:
@@ -1175,8 +1269,10 @@ def create_archive_unit_file(title_file, data, item_path, formulaire):
                             fullname = ET.SubElement(authorized_agent, "FullName")
                             fullname.text = file.get("EXIF:Artist")
                             # Créer les éléments Activity et Mandate avec leurs valeurs respectives
-                            ET.SubElement(authorized_agent, "Activity").text = formulaire["AuthorizedAgent_Activity"]
-                            ET.SubElement(authorized_agent, "Mandate").text = formulaire["AuthorizedAgent_Mandate"]
+                            ET.SubElement(authorized_agent, "Activity").text = (
+                                formulaire)["AuthorizedAgent_Activity"]
+                            ET.SubElement(authorized_agent, "Mandate").text = (
+                                formulaire)["AuthorizedAgent_Mandate"]
                         else:
                             if file.get("XMP:Creator"):
                                 authorized_agent = ET.SubElement(contentit, "AuthorizedAgent")
@@ -1184,8 +1280,10 @@ def create_archive_unit_file(title_file, data, item_path, formulaire):
                                 fullname = ET.SubElement(authorized_agent, "FullName")
                                 fullname.text = file.get("XMP:Creator")
                                 # Créer les éléments Activity et Mandate avec leurs valeurs respectives
-                                ET.SubElement(authorized_agent, "Activity").text = formulaire["AuthorizedAgent_Activity"]
-                                ET.SubElement(authorized_agent, "Mandate").text = formulaire["AuthorizedAgent_Mandate"]
+                                ET.SubElement(authorized_agent, "Activity").text = (
+                                    formulaire)["AuthorizedAgent_Activity"]
+                                ET.SubElement(authorized_agent, "Mandate").text = (
+                                    formulaire)["AuthorizedAgent_Mandate"]
                             else:
                                 pass
 
@@ -1351,10 +1449,10 @@ def id_attrib(arbre, archive_unit_id):
 
                 # Vérifie si le MessageDigest correspond au hash temporaire
                 message_digest = obj.find(".//MessageDigest").text
-                id = obj.attrib['id']
+                obj_id = obj.attrib['id']
                 if temp_hash == message_digest:
                     # Met à jour DataObjectGroupReferenceId avec l'identifiant du DataObjectGroup correspondant
-                    data_object_group_ref_id.text = id
+                    data_object_group_ref_id.text = obj_id
 
     return root  # Retourner l'arbre modifié
 
@@ -1364,6 +1462,7 @@ def create_management_metadata(arbre, formulaire):
     Crée et ajoute les métadonnées de gestion relatives au SIP.
 
     :param xml.etree.ElementTree.Element arbre: L'arbre XML à mettre à jour.
+    :param dict formulaire: Formulaire contenant les informations saisies par l'utilisateur.
 
     :return: xml.etree.ElementTree.Element - L'arbre XML avec les métadonnées descriptives ajoutées ou mises à jour.
     """
@@ -1384,8 +1483,10 @@ def create_management_metadata(arbre, formulaire):
     ET.SubElement(management_metadata, "ArchivalProfile").text = formulaire["ArchivalProfile"]
     ET.SubElement(management_metadata, "AcquisitionInformation").text = formulaire["AcquisitionInformation"]
     ET.SubElement(management_metadata, "LegalStatus").text = formulaire["LegalStatus"]
-    ET.SubElement(management_metadata, "OriginatingAgencyIdentifier").text = formulaire["OriginatingAgency_Identifier"]
-    ET.SubElement(management_metadata, "SubmissionAgencyIdentifier").text = formulaire["SubmissionAgency_Identifier"]
+    ET.SubElement(management_metadata, "OriginatingAgencyIdentifier").text = (
+        formulaire)["OriginatingAgency_Identifier"]
+    ET.SubElement(management_metadata, "SubmissionAgencyIdentifier").text = (
+        formulaire)["SubmissionAgency_Identifier"]
 
     # Trouve l'élément DescriptiveMetadata dans DataObjectPackage
     descriptive_metadata = data_object_package.find("DescriptiveMetadata")
@@ -1461,6 +1562,7 @@ def main():
     window = MainWindow()
     window.show()
     app.exec()
+
 
 if __name__ == "__main__":
     try:
